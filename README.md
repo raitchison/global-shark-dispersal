@@ -6,14 +6,14 @@ Code for "Global patterns and drivers of dispersal potential in sharks" by Aitch
 
 ## Contents and Structure
 
-*Data: contains data files
- *SharkData
- *HexCells
-*Scripts: contains analysis scripts
-*Results: contains results from analysis script
- *brmsOutputs
- *Figures
- *Tables
-*Supplementary_Material
- *Results
- *Scripts
+* Data: contains data files
+  - SharkData
+  - HexCells
+* Scripts: contains analysis scripts
+* Results: contains results from analysis script
+  - brmsOutputs
+  - Figures
+  - Tables
+* Supplementary_Material
+  - Results
+  - Scripts
