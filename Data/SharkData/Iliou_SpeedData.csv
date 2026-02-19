@@ -1,0 +1,26 @@
+Species,mass,speed,sample,trophic_level,temperature,habitat,reference,CFAR,UpperLobe,LowerLobe,Ratio,Name,CFAR_s,speed_s
+"Broadnose sevengill shark, Notorynchus cepedianus",-0.445912573,0.48,40.00 (0.00),4.7,cold,demersal,16,0.9389,0.314,0.089,3.528089888,Notorynchus_cepedianus,-1.398662235,-0.102385803
+"Bluntnose sixgill shark, Hexanchus griseus",0.626308332,0.34,3600(0.00),4.5,cold,bathydemersal,15,0.98,0.299,0.098,3.051020408,Hexanchus_griseus,-1.363284427,-0.662308166
+"Brown smoothhounds, Mustelus henlei",-0.637559211,0.09,5.00 (0.00),3.6,cold,demersal,17,1,0.201,0.081,2.481481481,Mustelus_henlei,-1.346068948,-1.662169528
+"Gummy shark, Mustelus antarcticus",-0.630563464,0.33,30.00 (0.00),4.3,cold,demersal,"16, 21",1.344,0.188,0.087,2.16091954,Mustelus_antarcticus,-1.049962715,-0.702302621
+"Leopard shark, Triakis semifasciata",-0.631821471,0.14,1.33 (0.00),3.7,cold,demersal,26,0.675,0.22,0.106,2.075471698,Triakis_semifasciata,-1.625820477,-1.462197256
+"Tiger shark, Galeocerdo curvier",0.70350701,1.06,0.26 (1.29),4.1,warm,benthopelagic,"21, 40, 41, 42",2.223,0.257,0.129,1.992248062,Galeocerdo_cuvier,-0.293342426,2.217292557
+"Scalloped hammerhead, Sphyrna lewini",-0.639492246,0.44,4.00 (0.00),4.1,warm,pelagic-oceanic,"21, 32, 33, 34",2.74,0.314,0.117,2.683760684,Sphyrna_lewini,0.151677698,-0.262363621
+"Lemon shark, Negaprion brevirostris",-0.563735674,0.39,2.26 (2.49),4.2,warm,reef-associated,"23, 24, 25",1.607,0.239,0.115,2.07826087,Negaprion_brevirostris,-0.82357917,-0.462335894
+"Blacktip reef shark, Carcharhinus melanopterus",-0.60745909,0.52,3600(0.00),3.9,warm,reef-associated,9,2.16,0.245,0.124,1.975806452,Carcharhinus_melanopterus,-0.347571184,0.057592014
+"Sandbar shark , Carcharhinus plumbeus",-0.589601527,0.45,4.00 (0.00),4.1,warm,benthopelagic,"18, 21, 31",3.472,0.269,0.126,2.134920635,Carcharhinus_plumbeus,0.781764218,-0.222369167
+"Bullshark, Carcharhinus leucas",-0.370186684,0.25,60.00 (0.00),4.3,warm,reef-associated,"18, 19",1.323529,0.282,0.111,2.540540541,Carcharhinus_leucas,-1.067583618,-1.022258257
+"Whitetip reef shark, Triaenodon obesus",-0.62844633,0.5,NA,4.2,warm,reef-associated,21,2.666,0.275,0.13,2.115384615,Triaenodon_obesus,0.087980427,-0.022396895
+"Grey reef sharks, Carcharhinus amblyrhynchos",-0.587085512,0.69,2.00 (0.00),4.1,warm,reef-associated,"21, 22",3.388,0.253,0.138,1.833333333,Carcharhinus_amblyrhynchos,0.709459208,0.737497741
+"Blue shark, Prionace glauca",-0.379637078,0.5,1.00 (3.70),4.1,mixed,pelagic-oceanic,"10, 11, 12, 13, 14",3.025,0.271,0.137,1.97810219,Prionace_glauca,0.396998269,-0.022396895
+"Oceanic whitetip shark, Carcharhinus longimanus",-0.346345915,0.71,3600(0.00),4.2,warm,pelagic-oceanic,9,3.07,0.31,0.145,2.137931034,Carcharhinus_longimanus,0.435733096,0.81748665
+"Dusky shark, Carcharhinus obscures",-0.635104563,0.22,4.00 (0.00),4.2,warm,reef-associated,"20, 21",2.784,0.295,0.137,2.153284672,Carcharhinus_obscurus,0.189551751,-1.14224162
+"Whale shark, Rhinocodon typus",2.406234921,0.42,0.59 (9.88),3.5,warm,pelagic-oceanic,"43, 44, 45, 46, 47, 48, 49, 50, 51, 52",5.12,0.241,0.173,1.393063584,Rhincodon_typus,2.200319662,-0.34235253
+"Bigeye thresher shark, Alopias superciliosus",-0.355550845,0.34,0.45 (0.40),4.2,mixed,pelagic-oceanic,"7, 8",2.645,0.447,0.067,6.671641791,Alopias_superciliosus,0.069904174,-0.662308166
+"Thresher shark, Alopias vulpinus",-0.552751124,0.6,12.00 (0.00),4.2,mixed,pelagic-oceanic,39,2.11,0.51,0.067,7.611940299,Alopias_vulpinus,-0.390609881,0.37754765
+"Megamouth shark, Megachasma pelagios",2.252911474,0.5,4.00 (0.00),3.4,warm,pelagic-oceanic,27,1.905,0.327,0.143,2.286713287,Megachasma_pelagios,-0.567068537,-0.022396895
+"Basking shark, Cetorhinus maximus",2.472571782,0.82,0.55 (2.61),3.2,cold,pelagic-oceanic,"1, 2, 3, 4, 5, 6",3.472,0.228,0.153,1.490196078,Cetorhinus_maximus,0.781764218,1.257425649
+"Salmon shark, Lamna ditropis",0.0056506,0.38,0.04 (0.00),4.5,cold,pelagic-oceanic,30,3.56,0.262,0.2,1.31,Lamna_ditropis,0.857512324,-0.502330348
+"Porbeagle shark, Lamna nasus",-0.319682302,1,0.04 (0.00),4.6,cold,pelagic-oceanic,29,3.7333,0.258,0.172,1.5,Lamna_nasus,1.006684447,1.97732583
+"White shark, Carcharodon carcharias",0.970818171,0.93,2.13 (6.58),4.5,mixed,pelagic-oceanic,"12, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64",4.033,0.21,0.144,1.458333333,Carcharodon_carcharias,1.264658395,1.697364648
+"Shortfin mako shark, Isurus oxyrinchus",-0.51706668,0.54,5.26 (2.00),4.3,mixed,pelagic-oceanic,"12, 35, 36, 37, 38",4.12,0.232,0.183,1.267759563,Isurus_oxyrinchus,1.339545728,0.137580923

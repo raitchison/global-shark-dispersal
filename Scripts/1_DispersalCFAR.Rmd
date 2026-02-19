@@ -1,0 +1,342 @@
+---
+title: "1_DispersalCFAR"
+output: html_document
+---
+
+## Purpose
+
+To demonstrate the utility of CFAR as a metric for dispersal ability:
+* CFAR vs. swimming speed (from Iliou et al. 2023: https://doi.org/10.1098/rsos.231127)
+* CFAR vs. geographic range
+
+### Step 1: Load libraries
+
+Load the libraries used.
+
+```{r}
+# Load tidyverse for dplyr and ggplot2
+library(tidyverse)
+
+# Load ape, geiger, and phytools for dealing with phylogenetic trees
+library(ape)
+library(geiger)
+library(phytools)
+
+# Load brms for analysis
+library(brms)
+
+# Load tidybayes for analyzing brms
+library(tidybayes)
+
+# Load packages  for plotting
+library(scales)
+library(cowplot)
+```
+
+## Step 2: Load data and phylogenetic trees
+
+```{r}
+## Swimming Speed Data ##
+# Downloaded and modified from Iliou et al. 2023 (doi:10.6084/m9.figshare.c.6858294)
+jacobyData <- read.csv("Data/SharkData/Iliou_SpeedData.csv") %>%
+  mutate(Genus_species = str_replace(Species, ".*,\\s*", "")) %>%
+  mutate(Genus_species = str_replace_all(Genus_species, " ", "_")) %>%
+  select(Genus_species, speed, CFAR) %>%
+  # Fix species name typos
+  mutate(Genus_species = case_when(
+    Genus_species == "Galeocerdo_curvier" ~ "Galeocerdo_cuvier",
+    Genus_species == "Carcharhinus_obscures" ~ "Carcharhinus_obscurus",
+    Genus_species == "Rhinocodon_typus" ~ "Rhincodon_typus",
+    TRUE ~ Genus_species
+  ))
+
+## Trait Data ##
+sharkData <- read.csv("Data/SharkData/TraitData.csv") %>%
+  # See 1_Supplemental_CategoricalAnalysis for Benthopelagic > Benthic and Deepwater > Coastal
+  # Benthopelagic > Benthic
+  mutate(WaterColumnPosition = case_when(
+    str_detect(WaterColumnPosition, "Pelagic") ~ "Pelagic",
+    WaterColumnPosition == "Benthic" ~ "Benthic",
+    WaterColumnPosition == "Benthopelagic" ~ "Benthic")) %>%
+  left_join(select(read.csv("Data/SharkData/IUCNrangeData.csv"), 
+                   "Genus_species", "area_sqkm"),
+            by = "Genus_species")
+
+## Phylogenetic Tree ##
+# Read in all 500 trees
+# There are different species in the trait data and swimming speed data so we need two "sets" of trees
+traitTrees <- read.nexus("Data/SharkData/PhyloTrees.nex")
+swimTrees <- traitTrees
+```
+
+## Step 3: Analyze swimming speed
+
+Since the swimming speed data has way fewer species than the trait data, we need to trim the phylogenetic trees.
+
+```{r}
+## Tree trimming for swimming speed data ##
+# Set the seed for reproducibility
+set.seed(123)
+
+# Sample out a single tree
+swimTree <- sample(swimTrees, 1)[[1]]
+
+# View which species are a mistmatch between the tree and data (should return Squalus_lalannei)
+diffNamesSwim <- name.check(swimTree, jacobyData, jacobyData$Genus_species)
+
+# Keep only tips that are present in the data
+swimTreeDrop <- drop.tip(swimTree,
+                        setdiff(swimTree$tip.label, 
+                                jacobyData$Genus_species))
+
+# Check names between tree and data
+swimDiffNamesCheck <- name.check(swimTreeDrop, jacobyData, 
+                                 jacobyData$Genus_species)
+
+# Drop Cetorhinus maximus and Mustelus antarcticus from data
+jacobyData <- jacobyData %>%
+  filter(Genus_species != "Cetorhinus_maximus",
+         Genus_species != "Mustelus_antarcticus")
+
+# Check names again (should return "OK")
+swimDiffNamesCheck <- name.check(swimTreeDrop, jacobyData, jacobyData$Genus_species)
+
+# Apply dropped species to all trees
+swimTreesTrim <- lapply(swimTrees, function(tr) {
+  drop.tip(tr, setdiff(tr$tip.label, jacobyData$Genus_species))
+})
+
+# Reassign class so augmentedTreesTrim is recognized as a multiPhylo object
+class(swimTreesTrim) <- "multiPhylo"
+
+# Confirm all trees now match the data (should return TRUE)
+all(sapply(swimTreesTrim, function(tr) {
+  length(setdiff(jacobyData$Genus_species, tr$tip.label)) == 0
+}))
+
+# Sample out a single tree
+swimTreeB <- sample(swimTreesTrim, 1)[[1]]
+
+# Double-check that names match (should return "OK")
+swimDiffNames2 <- name.check(swimTreeB, jacobyData, jacobyData$Genus_species)
+```
+
+Now analyze swimming speed with brms.
+
+```{r}
+## Anthony's Code ##
+# Scale CFAR
+jacobyDataScaled <- jacobyData
+jacobyDataScaled$CFAR <- scale(jacobyData$CFAR)
+
+# Create covariance matrix
+A <- ape::vcv(swimTreeB)
+  
+# Swimming Speed ~ CFAR + Phylogeny
+swim_prior <- get_prior(speed ~ CFAR + (1|gr(Genus_species, cov = A)),
+                      data = jacobyDataScaled,
+                      data2 = list(A = A),
+                      family = gaussian())
+# Set priors 
+priors_swim <- c(
+  # Mean speed around 0.3
+  prior(normal(0.3, 0.1), class = "Intercept"),  
+  prior(normal(0, 0.2), class = "b"),    
+  # Residual SD likely ~0.1–0.3
+  prior(exponential(5), class = "sigma"),
+  # Random effect SDs (including phylogenetic term)
+  prior(exponential(2), class = "sd")
+)
+
+swimSpeed <- brm(speed ~ CFAR + (1|gr(Genus_species, cov = A)),
+              data = jacobyData, 
+              data2 = list(A = A),
+              family = gaussian(),
+              prior = priors_swim,
+              # Increase adapt_delta due to small sample size
+              control = list(adapt_delta = 0.95),
+              warmup = 1000, iter = 3000,
+              cores = 2,
+              save_pars = save_pars(all = TRUE))
+
+summary(swimSpeed)
+
+# Save brms object
+saveRDS(swimSpeed, "Results/brmsOutputs/brmsSwimSpeed.rds")
+```
+
+Optional: load brms object if revisiting script.
+
+```{r}
+# Load brms objects using readRDS
+swimSpeed <- readRDS("Results/brmsOutputs/brmsSwimSpeed.rds")
+```
+
+Plot CFAR vs. swim speed
+
+```{r}
+# Tibble of results
+CFAR_swim <- tibble(
+  CFAR = seq(
+    min(jacobyData$CFAR, na.rm = TRUE),
+    max(jacobyData$CFAR, na.rm = TRUE),
+    # Smooth the line
+    length.out = 1000)
+  )
+
+# Expected values
+swim_epred_draws <- add_epred_draws(CFAR_swim, swimSpeed, ndraws = 500, 
+                                    re_formula = NA)
+
+# Plot
+speedPlot <- ggplot(swim_epred_draws, aes(x = CFAR, y = .epred)) +
+  stat_lineribbon(.width = 0, color = "#dbb6bd", alpha = 0.5) +  
+  geom_line(aes(group = .draw), color = "#dbb6bd", linewidth = 0.1, alpha = 0.1) +
+  geom_point(data = jacobyData, aes(x = CFAR, y = speed),
+             alpha = 0.8, color = "#b37c86", size = 2) +
+  ylim(0,1.5) +
+  labs(#title = "A",
+       x = "Caudal Fin Aspect Ratio", 
+       y = bquote('Swimming speed ('*m%.%s^{-1}*')')) +
+  theme_classic() +
+  theme(legend.position = "none",
+        # plot.title.position = "plot",
+        # plot.title = element_text(face = "bold", size = 10),
+        axis.text.x = element_text(size = 8),
+        axis.title.x = element_text(size = 10),
+        axis.text.y = element_text(size = 8),
+        axis.title.y = element_text(size = 10),
+        plot.margin = unit(c(0.02, 0.17, 0, 0), "cm"))
+
+speedPlot
+```
+
+## Step 4: Analyze geographic range
+
+```{r}
+# Set the seed for reproducibility
+set.seed(125)
+
+# Sample out a single tree
+singleTree <- sample(traitTrees, 1)[[1]]
+
+# Check if/where the tree and trait data differ (should return "OK")
+nameDrops <- name.check(singleTree, sharkData, sharkData$Genus_species)
+
+# Check length of df = length of tree (should return TRUE)
+length(sharkData$Genus_species) == length(singleTree$tip.label)
+
+# Reorder data to match tree just in case
+target <- singleTree$tip.label
+
+# Reorder sharkData rows in the same order as singleTree$tip.label
+sharkData <- sharkData[match(target, sharkData$Genus_species), ]
+
+# Rename rows to match tip labels
+rownames(sharkData) <- sharkData$Genus_species
+
+# Set variables to be scaled
+vars_to_scale <- c("MaximumBodySize", "ProportionalGillAverage", 
+                   "AvgTemperature", "CFAR")
+
+# Center and scale continuous variables (vars_to_scale)
+sharkDataScaled <- sharkData %>%
+  mutate(across(all_of(vars_to_scale), scale))
+```
+
+Run brms on geographic range vs CFAR
+
+```{r}
+# Create variance covariance matrix
+B <- ape::vcv(singleTree)
+
+## CFAR ~ Geographic Range + Phylogeny
+geoRange <- brm(area_sqkm ~ CFAR + (1|gr(Genus_species, cov = B)),
+          data = sharkDataScaled,
+          data2 = list(B = B),
+          family = Gamma(link = "log"),
+          warmup = 1000, iter = 3000,
+          cores = 2,
+          save_pars = save_pars(all = TRUE))
+
+summary(geoRange)
+
+# Save brms object
+saveRDS(geoRange, "Results/brmsOutputs/brmsGeographicRange.rds")
+```
+
+## Optional: Load brms object if revisiting script
+
+```{r}
+# Load brms objects using readRDS
+geoRange <- readRDS("Results/brmsOutputs/brmsGeographicRange.rds")
+```
+
+Plot CFAR vs. Geographic Range
+
+```{r}
+# Tibble of results
+CFAR_geo <- tibble(
+  CFAR = seq(
+    min(sharkData$CFAR, na.rm = TRUE),
+    max(sharkData$CFAR, na.rm = TRUE),
+    # Smooth the line
+    length.out = 1000)
+  )
+
+# Expected values
+geo_epred_draws <- add_epred_draws(CFAR_geo, geoRange, ndraws = 500, 
+                                    re_formula = NA)
+
+rangePlot <- ggplot(geo_epred_draws, aes(x = CFAR, y = .epred)) +
+  stat_lineribbon(.width = 0, color = "#775d8c", alpha = 0.5) +  
+  geom_line(aes(group = .draw), color = "#775d8c", linewidth = 0.1, alpha = 0.1) +
+  geom_point(data = sharkData, aes(x = CFAR, y = area_sqkm),
+             alpha = 0.8, color = "#2e193f", size = 2) +
+  scale_y_log10(# Set breaks at specific orders of magnitude
+    breaks = trans_breaks("log10", function(x) 10^x),
+    # Format labels nicely as scientific notation
+    labels = trans_format("log10", math_format(10^.x))) +
+  labs(#title = "B",
+       x = "Caudal Fin Aspect Ratio", 
+       y = bquote('Geographic Range ('*km^{2}*')')) +
+  theme_classic() +
+  theme(legend.position = "none",
+        # plot.title.position = "plot",
+        # plot.title = element_text(face = "bold", size = 10),
+        axis.text.x = element_text(size = 8),
+        axis.title.x = element_text(size = 10),
+        axis.text.y = element_text(size = 8),
+        axis.title.y = element_text(size = 10))
+
+rangePlot
+```
+
+Warning about 4 rows containing missing values are for:
+*Aulohalaelurus kanakorum*
+*Carcharhinus perezii*
+*Cephaloscyllium zebrum*
+*Chiloscyllium hasseltii*
+
+Which are missing geographic range data.
+
+Now, arrange plots and save.
+
+```{r}
+# Align plots by y-axis
+aligned <- align_plots(speedPlot, rangePlot, align = "v", axis = "l")
+
+# Arrange plots
+Figure1 <- plot_grid(
+  aligned[[1]],
+  aligned[[2]],
+  ncol = 1,
+  labels = c("A", "B"),
+  label_size = 10
+)
+
+# Save as Fig 1
+ggsave("Results/Figures/Fig1.eps", 
+       plot = Figure1, units = "px",
+       width = 1560, height = 1600)
+```
