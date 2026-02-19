@@ -336,7 +336,9 @@ Figure1 <- plot_grid(
 )
 
 # Save as Fig 1
-ggsave("Results/Figures/Fig1.eps", 
+ggsave("Results/Figures/Fig1.tiff", 
        plot = Figure1, units = "px",
-       width = 1560, height = 1600)
+       device = "tiff",
+       width = 1560, height = 1600,
+       dpi = 300)
 ```
