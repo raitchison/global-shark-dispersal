@@ -1,0 +1,637 @@
+---
+title: "2_MappingCFAR"
+output: html_document
+---
+
+## Purpose
+
+To map CFAR per hex cell.
+
+## Step 1: Load libraries
+
+Load the libraries used.
+
+```{r}
+# Load tidyverse
+library(tidyverse)
+
+# Load chondrichthyes.species.ranges
+# Private package (https://github.com/JayMatsushiba)
+library(chondrichthyes.species.ranges)
+
+# Load littany of packages for mapping
+library(sf)
+library(patchwork)
+library(rnaturalearthdata)
+library(rnaturalearth)
+library(furrr)
+library(purrr)
+library(tictoc)
+
+# Load scico for color palette
+library(scico)
+
+# Load libraries for combining plots
+library(cowplot)
+library(gridExtra)
+library(grid)
+```
+
+## Step 2: Load data, hex cells, and species ranges
+
+```{r}
+# Load shark data
+sharkData <- read.csv("Data/SharkData/TraitData.csv") %>%
+  # Spatial data is formatted as "Genus species" instead of "Genus_species"
+  mutate(Genus_species = str_replace_all(Genus_species, "_", " "))
+
+# Load hex cells
+hex <- st_read("Data/HexCells")
+
+# Load species ranges
+ranges <- chondrichthyes.species.ranges::get_ranges() %>%
+  # Reproject ranges onto the same CRS as the hex grid
+  st_transform(st_crs(hex))
+```
+
+## Step 3: Calculate intersection between ranges and hex grid
+
+```{r}
+# Calculate intersection between ranges and hex grid
+# tic() starts the timer
+tic("This is how long this process takes")
+# st_intersects() calculates the intersection between species ranges and the hex grid
+range_intersect_hex <- st_intersects(ranges, hex)
+# toc() ends the timer
+toc()
+```
+
+## Step 4: Join CFAR data onto range data
+
+```{r}
+# Keep only the species names and one trait
+CFAR_data <- sharkData %>%
+  select(sci_name = Genus_species, CFAR)
+
+# Left join CFAR data to range data
+allRanges <- left_join(ranges, CFAR_data, by = "sci_name")
+```
+
+## Step 5: Calculate CFAR per hex cell (mean and variability)
+
+```{r}
+# Create a long table of species-hex links from list (output of st_intersects())
+range_hex_df <- tibble(
+  # rep() to repeat each species index per intersecting hex
+  # lengths() determines how many hexes each species overlaps
+  species_index = rep(seq_along(range_intersect_hex), lengths(range_intersect_hex)),
+  # Flattens hex indices into one vector
+  hex_index = unlist(range_intersect_hex)
+)
+
+# Use species_index to index ranges$CFAR
+range_hex_df <- range_hex_df %>%
+  # Add a CFAR value to every species-hex combo
+  mutate(CFAR = allRanges$CFAR[species_index])
+
+# Collapse species-level data into hex-level summaries
+hex_cfar_stats <- range_hex_df %>%
+  # Group_by() hex (all species that occur in the same hex)
+  group_by(hex_index) %>%
+  # Compute summary statistics: mean and var
+  summarise(
+    mean_CFAR = mean(CFAR, na.rm = TRUE),
+    var_CFAR = var(CFAR, na.rm = TRUE),
+    # Ungroup results
+    .groups = "drop"
+  )
+
+# Add CFAR mean and var to hex
+hex$mean_CFAR <- NA_real_
+hex$var_CFAR <- NA_real_
+
+# Place values into the correct rows
+hex$mean_CFAR[hex_cfar_stats$hex_index] <- hex_cfar_stats$mean_CFAR
+hex$var_CFAR[hex_cfar_stats$hex_index] <- hex_cfar_stats$var_CFAR
+```
+
+## Step 6: Map Mean CFAR and Variability in CFAR
+
+Create a world for plotting.
+
+```{r}
+# Create world
+world <- ne_countries(scale = "medium", returnclass = "sf")
+# Match hex's CRS (Cylindrical Equal Area)
+world <- st_transform(world, st_crs(hex))
+
+# Define bounding box from world 
+world_extent <- sf::st_bbox(world)
+world_extent$xmin # -20037508 
+world_extent$xmax # 20037508
+world_extent$ymin # -6363885 
+world_extent$ymax # 6323867
+```
+
+Plot CFAR.
+
+```{r}
+mean_CFAR_map <- ggplot() +
+  geom_sf(data = world, fill = "grey82", color = "grey90", size = 0.2) +
+  geom_sf(data = hex, aes(fill = mean_CFAR), color = NA) +
+  scale_fill_scico(palette = "corkO", na.value = "grey95", name = "Mean CFAR",
+                   # Limits consistent across plots
+                   limits = c(0.15, 5.53)) +
+  # Set x limits and prevent expanding of plot beyond world
+  scale_x_continuous(
+    limits = c(world_extent$xmin, world_extent$xmax),
+    expand = c(0, 0)
+  ) +
+  # Set y limits and prevent expanding of plot beyond world
+  scale_y_continuous(
+    limits = c(world_extent$ymin, world_extent$ymax),
+    expand = c(0, 0)
+  ) +
+  labs(subtitle = "A") +
+  theme_minimal(base_size = 12) +
+  theme(
+    axis.text = element_blank(),
+    axis.title = element_blank(),
+    plot.subtitle = element_text(face = "bold", size = 10),
+    legend.position = "none",
+    plot.margin = unit(c(-0.1, 0, 0, 0), "cm")
+  )
+
+mean_CFAR_map
+
+var_CFAR_map <- ggplot() +
+  geom_sf(data = world, fill = "grey80", color = "grey90", size = 0.2) +
+  geom_sf(data = hex, aes(fill = var_CFAR), color = NA) +
+  scale_fill_gradient(low = "#e0aaff", high = "#311e4f", na.value = "grey95", 
+                      name = "Variation in CFAR",
+                      # Limits consistent across plots
+                      limits = c(0, 5)) +
+  # Set x limits and prevent expanding of plot beyond world
+  scale_x_continuous(
+    limits = c(world_extent$xmin, world_extent$xmax),
+    expand = c(0, 0)
+  ) +
+  # Set y limits and prevent expanding of plot beyond world
+  scale_y_continuous(
+    limits = c(world_extent$ymin, world_extent$ymax),
+    expand = c(0, 0)
+  ) +labs(subtitle = "B") +
+  theme_minimal(base_size = 12) +
+  theme(
+    axis.text = element_blank(),
+    axis.title = element_blank(),
+    plot.subtitle = element_text(face = "bold", size = 10),
+    legend.position = "none",
+    plot.margin = unit(c(-0.1, 0, 0, 0), "cm")
+  )
+
+var_CFAR_map
+```
+
+Extract legends.
+
+```{r}
+# Extract legend
+extract_legend <- function(p) {
+  g <- ggplotGrob(p)
+  legend <- g$grobs[
+    sapply(g$grobs, function(x) x$name) == "guide-box"
+  ][[1]]
+  return(legend)
+}
+
+# Left side legend
+legend_plot_left <- ggplot() +
+  geom_sf(data = world, fill = "grey82", color = "grey90", size = 0.2) +
+  geom_sf(data = hex, aes(fill = mean_CFAR), color = NA) +
+  scale_fill_scico(palette = "corkO", na.value = "grey95", 
+                   name = "Mean CFAR",
+                   # Limits consistent across plots
+                   limits = c(0.15, 5.53)) +
+  # Set x limits and prevent expanding of plot beyond world
+  scale_x_continuous(
+    limits = c(world_extent$xmin, world_extent$xmax),
+    expand = c(0, 0)
+  ) +
+  # Set y limits and prevent expanding of plot beyond world
+  scale_y_continuous(
+    limits = c(world_extent$ymin, world_extent$ymax),
+    expand = c(0, 0)
+  ) +
+  labs(subtitle = "A") +
+  theme_minimal(base_size = 12) +
+  theme(
+    axis.text = element_blank(),
+    axis.title = element_blank(),
+    plot.subtitle = element_text(face = "bold", size = 12),
+    legend.direction = "horizontal",
+    legend.background = element_rect(fill = "white", color = "transparent"),
+    legend.key.width = unit(1.8, 'cm'),
+    legend.title = element_text(size = 12, hjust = 0.5),
+    legend.title.position = "top",
+    legend.text = element_text(size = 10),
+    plot.margin = unit(c(0, 0, 0, 0), "cm")
+  )
+
+legend_left <- extract_legend(legend_plot_left)
+
+# Right side legend
+legend_plot_right <- ggplot() +
+  geom_sf(data = world, fill = "grey80", color = "grey90", size = 0.2) +
+  geom_sf(data = hex, aes(fill = var_CFAR), color = NA) +
+  scale_fill_gradient(low = "#e0aaff", high = "#311e4f", na.value = "grey95", 
+                      name = "Variation in CFAR",
+                      # Limits consistent across plots
+                      limits = c(0, 5)) +
+  # Set x limits and prevent expanding of plot beyond world
+  scale_x_continuous(
+    limits = c(world_extent$xmin, world_extent$xmax),
+    expand = c(0, 0)
+  ) +
+  # Set y limits and prevent expanding of plot beyond world
+  scale_y_continuous(
+    limits = c(world_extent$ymin, world_extent$ymax),
+    expand = c(0, 0)) +
+  labs(subtitle = "E") +
+  theme_minimal(base_size = 12) +
+  theme(
+    axis.text = element_blank(),
+    axis.title = element_blank(),
+    plot.subtitle = element_text(face = "bold", size = 12),
+    legend.direction = "horizontal",
+    legend.background = element_rect(fill = "white", color = "transparent"),
+    legend.key.width = unit(1.8, 'cm'),
+    legend.title = element_text(size = 12, hjust = 0.5),
+    legend.title.position = "top",
+    legend.text = element_text(size = 10),
+    plot.margin = unit(c(0, 0, 0, 0), "cm")
+  )
+
+legend_right <- extract_legend(legend_plot_right)
+```
+
+# Plot CFAR for each habitat use (PrimaryHabitat) category: pelagic, coastal, deepwater.
+
+1. Pelagic species
+
+```{r}
+# Filter sharkData for species by habitat type
+pelagic_sharks <- sharkData %>%
+  filter(PrimaryHabitat == "Pelagic")
+
+# Select species name and CFAR
+pelagicCFAR <- pelagic_sharks %>%
+  select(sci_name = Genus_species, CFAR)
+
+# Left join pelagic CFAR data to range data
+ranges_pelagic <- ranges %>%
+  left_join(pelagicCFAR, by = "sci_name") %>%
+  filter(!is.na(CFAR))
+
+# Timer for how long it takes to intersects ranges
+tic("Pelagic species: range–hex intersection")
+range_intersect_hex_pelagic <- st_intersects(ranges_pelagic, hex)
+toc()
+
+# Create tibble
+range_hex_df_pelagic <- tibble(
+  species_index = rep(
+    seq_along(range_intersect_hex_pelagic),
+    lengths(range_intersect_hex_pelagic)
+  ),
+  hex_index = unlist(range_intersect_hex_pelagic)
+)
+
+range_hex_df_pelagic <- range_hex_df_pelagic %>%
+  mutate(CFAR = ranges_pelagic$CFAR[species_index])
+
+hex_cfar_stats_pelagic <- range_hex_df_pelagic %>%
+  group_by(hex_index) %>%
+  summarise(
+    mean_CFAR_pelagic = mean(CFAR, na.rm = TRUE),
+    var_CFAR_pelagic  = var(CFAR,  na.rm = TRUE),
+    .groups = "drop"
+  )
+
+hex$mean_CFAR_pelagic <- NA_real_
+hex$var_CFAR_pelagic  <- NA_real_
+
+hex$mean_CFAR_pelagic[hex_cfar_stats_pelagic$hex_index] <-
+  hex_cfar_stats_pelagic$mean_CFAR_pelagic
+
+hex$var_CFAR_pelagic[hex_cfar_stats_pelagic$hex_index] <-
+  hex_cfar_stats_pelagic$var_CFAR_pelagic
+
+# Plot pelagic species
+mean_pelagic_map <- ggplot() +
+  geom_sf(data = world, fill = "grey80", color = "grey90", size = 0.2) +
+  geom_sf(data = hex, aes(fill = mean_CFAR_pelagic), color = NA) +
+  
+  scale_fill_scico(palette = "corkO", na.value = "grey95", name = "CFAR",
+                   # Limits consistent across plots
+                   limits = c(0.15, 5.53)) +
+  # Set x limits and prevent expanding of plot beyond world
+  scale_x_continuous(
+    limits = c(world_extent$xmin, world_extent$xmax),
+    expand = c(0, 0)
+  ) +
+  # Set y limits and prevent expanding of plot beyond world
+  scale_y_continuous(
+    limits = c(world_extent$ymin, world_extent$ymax),
+    expand = c(0, 0)
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    axis.text = element_blank(),
+    axis.title = element_blank(),
+    plot.title.position = "plot",
+    plot.title = element_text(face = "bold", size = 10),
+    legend.position = "none",
+    plot.margin = unit(c(0, 0, 0, 0), "cm")
+  ) +
+  labs(title = "C")
+
+mean_pelagic_map
+
+var_pelagic_map <- ggplot() +
+  geom_sf(data = world, fill = "grey80", color = "grey90", size = 0.2) +
+  geom_sf(data = hex, aes(fill = var_CFAR_pelagic), color = NA) +
+  scale_fill_gradient(low = "#e0aaff", high = "#311e4f", na.value = "grey95", name = "Var",
+                      # Limits consistent across plots
+                      limits = c(0, 5)) +
+  # Set x limits and prevent expanding of plot beyond world
+  scale_x_continuous(
+    limits = c(world_extent$xmin, world_extent$xmax),
+    expand = c(0, 0)
+  ) +
+  # Set y limits and prevent expanding of plot beyond world
+  scale_y_continuous(
+    limits = c(world_extent$ymin, world_extent$ymax),
+    expand = c(0, 0)
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    axis.text = element_blank(),
+    axis.title = element_blank(),
+    plot.title.position = "plot",
+    plot.title = element_text(face = "bold", size = 10),
+    legend.position = "none",
+    plot.margin = unit(c(0, 0, 0, 0), "cm")) +
+  labs(title = "D")
+
+var_pelagic_map
+```
+
+2. Coastal species
+
+```{r}
+coastal_sharks <- sharkData %>%
+  filter(PrimaryHabitat == "Coastal")
+
+# Select species name and CFAR
+coastalCFAR <- coastal_sharks %>%
+  select(sci_name = Genus_species, CFAR)
+
+# Left join coastal CFAR data to range data
+ranges_coastal <- ranges %>%
+  left_join(coastalCFAR, by = "sci_name") %>%
+  filter(!is.na(CFAR))
+
+# Timer for how long it takes to intersects ranges
+tic("Coastal species: range–hex intersection")
+range_intersect_hex_coastal <- st_intersects(ranges_coastal, hex)
+toc()
+
+
+range_hex_df_coastal <- tibble(
+  species_index = rep(
+    seq_along(range_intersect_hex_coastal),
+    lengths(range_intersect_hex_coastal)
+  ),
+  hex_index = unlist(range_intersect_hex_coastal)
+)
+
+range_hex_df_coastal <- range_hex_df_coastal %>%
+  mutate(CFAR = ranges_coastal$CFAR[species_index])
+
+hex_cfar_stats_coastal <- range_hex_df_coastal %>%
+  group_by(hex_index) %>%
+  summarise(
+    mean_CFAR_coastal = mean(CFAR, na.rm = TRUE),
+    var_CFAR_coastal  = var(CFAR,  na.rm = TRUE),
+    .groups = "drop"
+  )
+
+hex$mean_CFAR_coastal <- NA_real_
+hex$var_CFAR_coastal  <- NA_real_
+
+hex$mean_CFAR_coastal[hex_cfar_stats_coastal$hex_index] <-
+  hex_cfar_stats_coastal$mean_CFAR_coastal
+
+hex$var_CFAR_coastal[hex_cfar_stats_coastal$hex_index] <-
+  hex_cfar_stats_coastal$var_CFAR_coastal
+
+# Plot coastal species
+mean_coastal_map <- ggplot() +
+  geom_sf(data = world, fill = "grey80", color = "grey90", size = 0.2) +
+  geom_sf(data = hex, aes(fill = mean_CFAR_coastal), color = NA) +
+  
+  scale_fill_scico(palette = "corkO", na.value = "grey95", name = "CFAR",
+                   # Limits consistent across plots
+                   limits = c(0.15, 5.53)) +
+  # Set x limits and prevent expanding of plot beyond world
+  scale_x_continuous(
+    limits = c(world_extent$xmin, world_extent$xmax),
+    expand = c(0, 0)
+  ) +
+  # Set y limits and prevent expanding of plot beyond world
+  scale_y_continuous(
+    limits = c(world_extent$ymin, world_extent$ymax),
+    expand = c(0, 0)
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    axis.text = element_blank(),
+    axis.title = element_blank(),
+    plot.title.position = "plot",
+    plot.title = element_text(face = "bold", size = 10),
+    legend.position = "none",
+    plot.margin = unit(c(0, 0, 0, 0), "cm")
+  ) +
+  labs(title = "E")
+
+mean_coastal_map
+
+var_coastal_map <- ggplot() +
+  geom_sf(data = world, fill = "grey80", color = "grey90", size = 0.2) +
+  geom_sf(data = hex, aes(fill = var_CFAR_coastal), color = NA) +
+  scale_fill_gradient(low = "#e0aaff", high = "#311e4f", na.value = "grey95", name = "Var",
+                      # Limits consistent across plots
+                      limits = c(0, 5)) +
+  # Set x limits and prevent expanding of plot beyond world
+  scale_x_continuous(
+    limits = c(world_extent$xmin, world_extent$xmax),
+    expand = c(0, 0)
+  ) +
+  # Set y limits and prevent expanding of plot beyond world
+  scale_y_continuous(
+    limits = c(world_extent$ymin, world_extent$ymax),
+    expand = c(0, 0)
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    axis.text = element_blank(),
+    axis.title = element_blank(),
+    plot.title.position = "plot",
+    plot.title = element_text(face = "bold", size = 10),
+    legend.position = "none",
+    plot.margin = unit(c(0, 0, 0, 0), "cm")) +
+  labs(title = "F")
+
+var_coastal_map
+```
+
+3. Deepwater species
+
+```{r}
+deepwater_sharks <- sharkData %>%
+  filter(PrimaryHabitat == "Deepwater")
+
+# Select species name and CFAR
+deepwaterCFAR <- deepwater_sharks %>%
+  select(sci_name = Genus_species, CFAR)
+
+# Left join deepwater CFAR data to range data
+ranges_deepwater <- ranges %>%
+  left_join(deepwaterCFAR, by = "sci_name") %>%
+  filter(!is.na(CFAR))
+
+# Timer for how long it takes to intersects ranges
+tic("Deepwater species: range–hex intersection")
+range_intersect_hex_deepwater <- st_intersects(ranges_deepwater, hex)
+toc()
+
+
+range_hex_df_deepwater <- tibble(
+  species_index = rep(
+    seq_along(range_intersect_hex_deepwater),
+    lengths(range_intersect_hex_deepwater)
+  ),
+  hex_index = unlist(range_intersect_hex_deepwater)
+)
+
+range_hex_df_deepwater <- range_hex_df_deepwater %>%
+  mutate(CFAR = ranges_deepwater$CFAR[species_index])
+
+hex_cfar_stats_deepwater <- range_hex_df_deepwater %>%
+  group_by(hex_index) %>%
+  summarise(
+    mean_CFAR_deepwater = mean(CFAR, na.rm = TRUE),
+    var_CFAR_deepwater  = var(CFAR,  na.rm = TRUE),
+    .groups = "drop"
+  )
+
+hex$mean_CFAR_deepwater <- NA_real_
+hex$var_CFAR_deepwater  <- NA_real_
+
+hex$mean_CFAR_deepwater[hex_cfar_stats_deepwater$hex_index] <-
+  hex_cfar_stats_deepwater$mean_CFAR_deepwater
+
+hex$var_CFAR_deepwater[hex_cfar_stats_deepwater$hex_index] <-
+  hex_cfar_stats_deepwater$var_CFAR_deepwater
+
+# Plot deepwater species
+mean_deepwater_map <- ggplot() +
+  geom_sf(data = world, fill = "grey80", color = "grey90", size = 0.2) +
+  geom_sf(data = hex, aes(fill = mean_CFAR_deepwater), color = NA) +
+  
+  scale_fill_scico(palette = "corkO", na.value = "grey95", name = "CFAR",
+                   # Limits consistent across plots
+                   limits = c(0.15, 5.53)) +
+  # Set x limits and prevent expanding of plot beyond world
+  scale_x_continuous(
+    limits = c(world_extent$xmin, world_extent$xmax),
+    expand = c(0, 0)
+  ) +
+  # Set y limits and prevent expanding of plot beyond world
+  scale_y_continuous(
+    limits = c(world_extent$ymin, world_extent$ymax),
+    expand = c(0, 0)
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    axis.text = element_blank(),
+    axis.title = element_blank(),
+    plot.title.position = "plot",
+    plot.title = element_text(face = "bold", size = 10),
+    legend.position = "none",
+    plot.margin = unit(c(0, 0, -0.2, 0), "cm")
+  ) +
+  labs(title = "G")
+
+mean_deepwater_map
+
+var_deepwater_map <- ggplot() +
+  geom_sf(data = world, fill = "grey80", color = "grey90", size = 0.2) +
+  geom_sf(data = hex, aes(fill = var_CFAR_deepwater), color = NA) +
+  scale_fill_gradient(low = "#e0aaff", high = "#311e4f", na.value = "grey95", name = "Var",
+                      # Limits consistent across plots
+                      limits = c(0, 5)) +
+  # Set x limits and prevent expanding of plot beyond world
+  scale_x_continuous(
+    limits = c(world_extent$xmin, world_extent$xmax),
+    expand = c(0, 0)
+  ) +
+  # Set y limits and prevent expanding of plot beyond world
+  scale_y_continuous(
+    limits = c(world_extent$ymin, world_extent$ymax),
+    expand = c(0, 0)
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    axis.text = element_blank(),
+    axis.title = element_blank(),
+    plot.subtitle = element_text(face = "bold", size = 10),
+    legend.position = "none",
+    plot.margin = unit(c(0, 0, 0, 0), "cm")) +
+  labs(subtitle = "H")
+
+var_deepwater_map
+```
+
+Combine all plots.
+
+```{r}
+left_column <- arrangeGrob(
+  legend_left,
+  arrangeGrob(mean_CFAR_map, mean_pelagic_map,
+              mean_coastal_map, mean_deepwater_map,
+              ncol = 1),
+  heights = c(0.14, 1)
+)
+
+right_column <- arrangeGrob(
+  legend_right,
+  arrangeGrob(var_CFAR_map, var_pelagic_map,
+              var_coastal_map, var_deepwater_map,
+              ncol = 1),
+  heights = c(0.14, 1)
+)
+
+Figure2 <- arrangeGrob(
+  left_column,
+  right_column,
+  ncol = 2,
+  widths = c(1, 1)
+)
+
+ggsave("Results/Figures/Fig2.tiff", 
+       plot = Figure2, units = "px",
+       device = "tiff",
+       width = 2250, height = 2000, dpi = 300)
+```
