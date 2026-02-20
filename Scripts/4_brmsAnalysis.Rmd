@@ -1,0 +1,725 @@
+---
+title: "4_brmsAnalysis"
+output: html_document
+---
+
+## Purpose
+
+To model adjustment sets using the 'brms' package.
+
+Adjustment sets come from dagitty.
+
+### Step 1: Load libraries
+
+Load the libraries used.
+
+```{r}
+# Load tidyverse for sanity
+library(tidyverse)
+
+# Load ape, geiger, and phytools for dealing with phylogenetic trees
+library(ape)
+library(geiger)
+library(phytools)
+
+# Load brms for analysis
+library(brms)
+
+# Load tidybayes for analyzing brms
+library(tidybayes)
+
+# Load DHARMa for visualizing model fit
+library(DHARMa)
+
+# Load ggtext and gridExtra  for plotting
+library(ggtext)
+library(cowplot)
+library(gridExtra)
+library(grid)
+```
+
+## Step 2: Load data and phylogenetic trees
+
+```{r}
+## Trait Data ##
+sharkData <- read.csv("Data/SharkData/TraitData.csv") %>%
+  # See 1_Supplemental_CategoricalAnalysis for Benthopelagic > Benthic
+  mutate(WaterColumnPosition = case_when(
+   str_detect(WaterColumnPosition, "Pelagic") ~ "Pelagic",
+   WaterColumnPosition == "Benthic" ~ "Benthic",
+   WaterColumnPosition == "Benthopelagic" ~ "Benthic")) %>%
+  mutate(WaterColumnPosition = as.factor(WaterColumnPosition))
+
+# Store the original data frame for use later
+OGsharkData <- sharkData
+
+## Phylogenetic Tree ##
+# Read in all 500 trees
+allTrees <- read.nexus("Data/SharkData/PhyloTrees.nex")
+```
+
+## Step 3: Prepare data and tree
+
+```{r}
+# Set the seed for reproducibility
+set.seed(125)
+
+# Sample out a single tree
+singleTree <- sample(allTrees, 1)[[1]]
+
+# Check if/where the tree and trait data differ (should return "OK")
+nameDrops <- name.check(singleTree, sharkData, sharkData$Genus_species)
+
+# Check length of df = length of tree (should return TRUE)
+length(sharkData$Genus_species) == length(singleTree$tip.label)
+
+# Reorder data to match tree just in case
+target <- singleTree$tip.label
+
+# Reorder sharkData rows in the same order as singleTree$tip.label
+sharkData <- sharkData[match(target, sharkData$Genus_species), ]
+
+# Rename rows to match tip labels
+rownames(sharkData) <- sharkData$Genus_species
+
+# Log MaximumBodySize
+sharkData <- sharkData %>% 
+  mutate(MaximumBodySize = log(MaximumBodySize))
+
+# Set variables to be scaled
+vars_to_scale <- c("MaximumBodySize", "ProportionalGillAverage", "AvgTemperature")
+
+# Center and scale continuous variables (vars_to_scale)
+sharkData <- sharkData %>%
+  mutate(across(all_of(vars_to_scale), scale))
+```
+
+## Step 4: Run brms
+
+```{r}
+# Create variance covariance matrix
+B <- ape::vcv(singleTree)
+
+## Adjustment set 1: AvgTemperature as exposure (CFAR ~ AvgTemperature)
+# Build and run model
+avgT <- brm(CFAR ~ AvgTemperature + (1|gr(Genus_species, cov = B)),
+          data = sharkData,
+          data2 = list(B = B),
+          family = Gamma(link = "log"),
+          warmup = 1000, iter = 3000,
+          cores = 2,
+          save_pars = save_pars(all = TRUE))
+
+summary(avgT)
+
+# Visualize model fit with DHARMa
+model.check.avgT <- createDHARMa(
+  simulatedResponse = t(posterior_predict(avgT)),
+  observedResponse = sharkData$CFAR,
+  fittedPredictedResponse = apply(t(posterior_epred(avgT)), 1, mean),
+  integerResponse = FALSE
+)
+
+plot(model.check.avgT)
+
+# Save brms object
+saveRDS(avgT, "Results/brmsOutputs/brmsAvgT.rds")
+
+## Adjustment set 2: MaximumBodySize as exposure (CFAR ~ MaximumBodySize + WaterColumnPosition)
+# Build and run model
+maxBodySize <- brm(CFAR ~ MaximumBodySize + WaterColumnPosition +
+                          (1|gr(Genus_species, cov = B)),
+          data = sharkData,
+          data2 = list(B = B),
+          family = Gamma(link = "log"),
+          warmup = 1000, iter = 3000,
+          cores = 2,
+          save_pars = save_pars(all = TRUE))
+
+summary(maxBodySize)
+
+# Visualize model fit with DHARMa
+model.check.maxBodySize <- createDHARMa(
+  simulatedResponse = t(posterior_predict(maxBodySize)),
+  observedResponse = sharkData$CFAR,
+  fittedPredictedResponse = apply(t(posterior_epred(maxBodySize)), 1, mean),
+  integerResponse = FALSE
+)
+
+plot(model.check.maxBodySize)
+
+# Save brms object
+saveRDS(maxBodySize, "Results/brmsOutputs/brmsMaxBodySize.rds")
+
+## Adjustment set 3: WaterColumnPosition as exposure 
+# (CFAR ~ WaterColumnPosition)
+# Build and run model
+waterColPos <- brm(CFAR ~ 0 + WaterColumnPosition +
+                     (1|gr(Genus_species, cov = B)),
+          data = sharkData,
+          data2 = list(B = B),
+          family = Gamma(link = "log"),
+          warmup = 1000, iter = 3000,
+          cores = 2,
+          save_pars = save_pars(all = TRUE))
+
+summary(waterColPos)
+
+# Visualize model fit with DHARMa
+model.check.waterColPos <- createDHARMa(
+  simulatedResponse = t(posterior_predict(waterColPos)),
+  observedResponse = sharkData$CFAR,
+  fittedPredictedResponse = apply(t(posterior_epred(waterColPos)), 1, mean),
+  integerResponse = FALSE
+)
+
+plot(model.check.waterColPos)
+
+# Save brms object
+saveRDS(waterColPos, "Results/brmsOutputs/brmsWaterColPos.rds")
+
+## Adjustment set 4: ProportionalGillAverage as exposure 
+# (CFAR ~ ProportionalGillAverage + MaximumBodySize + WaterColumnPosition)
+# Build and run model
+gillHeight <- brm(CFAR ~ ProportionalGillAverage + MaximumBodySize +
+                    WaterColumnPosition +
+                    (1|gr(Genus_species, cov = B)),
+          data = sharkData,
+          data2 = list(B = B),
+          family = Gamma(link = "log"),
+          warmup = 1000, iter = 3000,
+          cores = 2,
+          save_pars = save_pars(all = TRUE))
+
+summary(gillHeight)
+
+# Visualize model fit with DHARMa
+model.check.gillHeight <- createDHARMa(
+  simulatedResponse = t(posterior_predict(gillHeight)),
+  observedResponse = sharkData$CFAR,
+  fittedPredictedResponse = apply(t(posterior_epred(gillHeight)), 1, mean),
+  integerResponse = FALSE
+)
+
+plot(model.check.gillHeight)
+
+# Save brms object
+saveRDS(gillHeight, "Results/brmsOutputs/brmsGillHeight.rds")
+```
+
+## Optional: Load brms objects if revisiting script
+
+```{r}
+# Load brms objects using readRDS
+avgT <- readRDS("Results/brmsOutputs/brmsAvgT.rds")
+maxBodySize <- readRDS("Results/brmsOutputs/brmsMaxBodySize.rds")
+waterColPos <- readRDS("Results/brmsOutputs/brmsWaterColPos.rds")
+gillHeight <- readRDS("Results/brmsOutputs/brmsGillHeight.rds")
+```
+
+## Step 5: Analyze brms results
+
+```{r}
+# Continuous variables
+continuous_list <- list(
+  # Average temperature model
+  avgT %>% spread_draws(b_AvgTemperature) %>%
+    transmute(estimate = b_AvgTemperature, term = "Average Temperature", 
+              model = "avgT"),
+  # Body Size model
+  maxBodySize %>% spread_draws(b_MaximumBodySize) %>%
+    transmute(estimate = b_MaximumBodySize, term = "Maximum Body Size", 
+              model = "maxBodySize"),
+  # Gill slit height model
+  gillHeight %>% spread_draws(b_ProportionalGillAverage) %>%
+    transmute(estimate = b_ProportionalGillAverage, term = "Gill Slit Height", 
+              model = "gillHeight")
+)
+
+# Water column position 
+waterPos_list <- list(
+  waterColPos %>% spread_draws(b_WaterColumnPositionBenthic) %>%
+    transmute(estimate = exp(b_WaterColumnPositionBenthic), term = "Benthic", 
+              model = "waterColPos"),
+  waterColPos %>% spread_draws(b_WaterColumnPositionPelagic) %>%
+    transmute(estimate = exp(b_WaterColumnPositionPelagic), term = "Pelagic", 
+              model = "waterColPos") 
+)
+
+# Function to summarize each coefficient
+summarize_coefs <- function(df) {
+  df %>%
+    # Mean + 95% credible interval
+    mean_qi(estimate, .width = 0.95)
+}
+
+# Bind rows by column names to combine all spread_draws
+continuousCoefs <- bind_rows(continuous_list)
+waterCoefs <- bind_rows(waterPos_list)
+
+# Run continuousCoefs and waterCoefs through summarize_coefs function
+continuousSummary <- continuousCoefs %>% 
+  summarize_coefs()
+
+waterPosSummary <- waterCoefs %>%
+  summarize_coefs()
+```
+
+## Step 6: Plot brms results
+
+```{r}
+## Continuous variables ##
+# Create a tibble of labels
+contLabels <- tibble::tibble(
+  term = c("Maximum Body Size", "Gill Slit Height", "Average Temperature"),
+  label = c(
+    # Maximum Body Size
+    "<b><span style='color:#424B54;'>Maximum Body Size</span></b> + Water Column Position",
+    
+    # Gill Slit Height
+    "<b><span style='color:#93A8AC;'>Gill Slit Height</span></b> + Maximum Body Size + Water Column Position",
+    
+    # Avg Temp
+    "<b><span style='color:#9B6A6C;'>Average Temperature</span></b>"
+  )
+)
+
+# Compute centers
+contCenters <- continuousCoefs %>%
+  group_by(term) %>%
+  summarize(estimate = mean(estimate), .groups = "drop") %>%
+  mutate(y = fct_rev(fct_reorder(term, estimate, .desc = TRUE)))
+
+# Join centers to labels
+contLabels <- contLabels %>% 
+  left_join(contCenters, by = "term")
+
+# Plot the continuous variables
+contPlot <- ggplot(continuousCoefs, 
+                   aes(x = estimate, 
+                       y = fct_rev(fct_reorder(term, estimate, .desc = TRUE)),
+                       fill = term)) +
+  stat_halfeye(.width = c(0.95, 0.95, 0.95), point_interval = mean_qi,
+               scale = .82) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "grey50") +
+  scale_fill_manual(values = c("Gill Slit Height" = "#93A8AC",
+                               "Average Temperature" = "#9B6A6C",
+                               "Maximum Body Size" = "#424B54")) +
+  xlim(-0.45, 0.7) +
+  scale_y_discrete(expand = expansion(mult = c(0.15, 0))) +
+  labs(x = "Coefficient Estimate",
+       title = "A") +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 10),
+        axis.title.x = element_text(size = 10),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.title.y = element_blank(),
+        legend.position = "none",
+        plot.title.position = "plot",
+        plot.title = element_text(face = "bold", size = 10),
+        plot.margin = unit(c(0, 0.25, 0, 0.15), "cm")) +
+  geom_richtext(
+    data = contLabels,
+    aes(x = estimate, y = term, label = label),
+    inherit.aes = FALSE,
+    hjust = 0.5,
+    size = 3.4,
+    vjust = 1.3,
+    fill = "white",
+    label.color = NA
+  ) +
+  geom_segment(aes(x = -0.1093399, xend = -0.1093399, y = 1.03, yend = 1.7), 
+               color = "#FFFFFF") +
+  geom_segment(aes(x = 0.1366995, xend = 0.1366995, y = 2.03, yend = 2.82), 
+               color = "#FFFFFF") +
+  geom_segment(aes(x = 0.1527054, xend = 0.1527054, y = 3.03, yend = 3.8), 
+               color = "#FFFFFF")
+
+contPlot
+```
+
+```{r}
+## Water column position ##
+# Create a tibble of labels
+waterPosLabels <- tibble::tibble(
+  term = factor(c("Benthic", "Pelagic"),
+                levels = c("Benthic", "Pelagic")),
+  label = c(
+    "<b><span style='color:#103f4d;'>Benthic</span></b>",
+    "<b><span style='color:#82e1da;'>Pelagic</span></b>"
+  )
+)
+
+# Compute centers
+waterPosCenters <- waterCoefs %>%
+  group_by(term) %>%
+  summarize(estimate = mean(estimate), .groups = "drop") %>%
+  mutate(y = fct_rev(fct_reorder(term, estimate, .desc = TRUE)))
+
+# Join centers to labels
+waterPosLabels <- waterPosLabels %>% 
+  left_join(waterPosCenters, by = "term")
+
+waterPosTitle <- tibble::tibble(
+  term = "Title",
+  label = c(
+    "<b>Water Column Position</b> + Average Temperature + Maximum Body Size"))
+
+# Plot water column position
+waterPosPlot <- ggplot(waterCoefs, 
+                   aes(x = estimate, 
+                       y = fct_rev(fct_reorder(term, estimate, .desc = TRUE)),
+                       fill = term)) +
+  stat_halfeye(.width = c(0.95, 0.95, 0.95), point_interval = mean_qi) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "grey50") +
+  scale_fill_manual(values = c("Benthic" = "#103f4d",
+                               "Pelagic" = "#82e1da")) +
+  scale_x_continuous(limits = c(-0.1, 5.5),
+                     breaks = seq(0, 5, 1)) +
+  labs(title = "B",
+       subtitle = "**Water Column Position**",
+       x = "Estimated Marginal Means") +
+  theme_classic() +
+  theme(plot.subtitle = element_markdown(margin = margin(t = 10, b = -17), 
+                                      hjust = 0.5, size = 9),
+        axis.text.x = element_text(size = 10),
+        axis.title.x = element_text(size = 10),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.title.y = element_blank(),
+        legend.position = "none",
+        plot.title.position = "plot",
+        plot.title = element_text(face = "bold", size = 10),
+        plot.margin = unit(c(-0.1, 0.25, 0, 0.15), "cm")) +
+  geom_richtext(
+    data = waterPosLabels,
+    aes(x = estimate, y = term, label = label),
+    inherit.aes = FALSE,
+    hjust = 0.5,
+    size = 3.4,
+    vjust = 1.3,
+    fill = NA,
+    label.color = NA
+  )
+
+waterPosPlot
+```
+
+* Warning about removed rows: 
+The very long, improbable tails of water col position are trimmed by the x-axis limits
+
+Arrange brms results plots.
+
+```{r}
+spacer <- nullGrob()
+
+brms_left_column <- arrangeGrob(spacer, contPlot, spacer, waterPosPlot, spacer,
+                                ncol = 1, heights = c(0.05, 2.15, 0.1, 0.85, 0.05))
+```
+
+* Warning about removed rows: 
+The very long, improbable tails of water col position are trimmed by the x-axis limits
+
+# Step 7: Scatter plots of variables
+
+Plot data vs. CFAR and add brms 
+
+```{r}
+## Maximum Body Size ##
+# Tibble of results
+maxSize <- tibble(
+   MaximumBodySize = seq(
+    min(sharkData$MaximumBodySize, na.rm = TRUE),
+    max(sharkData$MaximumBodySize, na.rm = TRUE),
+    # Smooth the line
+    length.out = 200)
+  )
+
+# Create prediction grid with both water column positions
+maxSize_avg <- maxSize %>%
+  crossing(
+    WaterColumnPosition = levels(sharkData$WaterColumnPosition)
+  )
+
+# Expected values
+maxBodySize_epred_draws <- add_epred_draws(newdata = maxSize_avg, 
+                                           object = maxBodySize,
+                                           ndraws = 200, re_formula = NA)
+
+# Average to get one y per x per draw
+maxBody_epred_avg <- maxBodySize_epred_draws %>%
+  group_by(.draw, MaximumBodySize) %>%
+  summarise(
+    .epred = mean(.epred),
+    .groups = "drop"
+  )
+
+# Plot
+maxBodySize_plot <- ggplot(maxBody_epred_avg, aes(x = MaximumBodySize, y = .epred)) +
+  stat_lineribbon(.width = 0, color = "#20272f", alpha = 0.5) +  
+  geom_line(aes(group = .draw), color = "#20272f", linewidth = 0.1, alpha = 0.1) +
+  geom_point(data = sharkData, aes(x = MaximumBodySize, y = CFAR),
+             alpha = 0.7, color = "#424B54", size = 2) +
+  labs(title = "C",
+       x = "Maximum Body Size", y = "CFAR") +
+  theme_classic() +
+  theme(legend.position = "none",
+        plot.title.position = "plot",
+        plot.title = element_text(face = "bold", size = 10),
+        axis.text.x = element_text(size = 8),
+        axis.title.x = element_text(size = 10),
+        axis.text.y = element_text(size = 8),
+        axis.title.y = element_text(size = 10),
+        plot.margin = unit(c(0, 0.1, 0, 0), "cm"))
+
+maxBodySize_plot
+
+# Because scaling on the x axis
+log_body <- log(OGsharkData$MaximumBodySize)
+
+body_mean <- mean(log_body, na.rm = TRUE)
+body_sd   <- sd(log_body, na.rm = TRUE)
+
+# Modifying the breaks
+BodyScaled_breaks <- c(-2, 0, 2, 4)
+
+BodyLog_breaks <- BodyScaled_breaks * body_sd + body_mean
+
+BodyOriginal_breaks <- exp(BodyLog_breaks)
+BodyOriginal_breaks
+  
+maxBodySize_plot <- ggplot(maxBody_epred_avg, aes(x = MaximumBodySize, y = .epred)) +
+  geom_line(aes(group = .draw), color = "#20272f", linewidth = 0.1, alpha = 0.1) +
+  geom_point(data = sharkData, aes(x = MaximumBodySize, y = CFAR),
+             alpha = 0.7, color = "#424B54", size = 2) +
+  stat_lineribbon(.width = 0, color = "#20272f", alpha = 0.5) +
+  scale_x_continuous(breaks = BodyScaled_breaks,
+                     labels = round(BodyOriginal_breaks)) +
+  labs(title = "C",
+       x = "Maximum Body Size (cm)", y = "CFAR") +
+  theme_classic() +
+  theme(legend.position = "none",
+        plot.title.position = "plot",
+        plot.title = element_text(face = "bold", size = 10),
+        axis.text.x = element_text(size = 8),
+        axis.title.x = element_text(size = 10),
+        axis.text.y = element_text(size = 8),
+        axis.title.y = element_text(size = 10),
+        plot.margin = unit(c(0, 0.1, 0, 0), "cm"))
+
+maxBodySize_plot
+
+## Gill Slit Height ##
+# Tibble of results
+gillSlitHeight <- tibble(
+  ProportionalGillAverage = seq(
+    min(sharkData$ProportionalGillAverage, na.rm = TRUE),
+    max(sharkData$ProportionalGillAverage, na.rm = TRUE),
+    length.out = 200))
+
+# Create a mean Max Body Size to "hold"
+mean_maxSize <- mean(sharkData$MaximumBodySize)
+
+# Create prediciton grid with both water column positions and max body size
+gillSlit_avg <- gillSlitHeight %>%
+  crossing(WaterColumnPosition = unique(sharkData$WaterColumnPosition)) %>%
+  mutate(
+    MaximumBodySize = mean_maxSize,
+    WaterColumnPosition = factor(
+      WaterColumnPosition,
+      levels = levels(as.factor(sharkData$WaterColumnPosition))
+    )
+  )
+
+# Expected values
+gillSlit_epred_draws <- add_epred_draws(newdata = gillSlit_avg, object = gillHeight,
+                                           ndraws = 200, re_formula = NA)
+
+# Average to get one y per x per draw
+gillSlit_epred_avg <- gillSlit_epred_draws %>%
+  group_by(.draw, ProportionalGillAverage) %>%
+  summarise(
+    .epred = mean(.epred),
+    .groups = "drop"
+  )
+
+# Plot
+gillHeight_plot <- ggplot(gillSlit_epred_avg, aes(x = ProportionalGillAverage, y = .epred)) +
+  geom_line(aes(group = .draw), color = "#56696d", linewidth = 0.1, alpha = 0.1) +
+  geom_point(data = sharkData, aes(x = ProportionalGillAverage, y = CFAR),
+             alpha = 0.7, color = "#93A8AC", size = 2) +
+  stat_lineribbon(.width = 0, color = "#56696d", alpha = 0.5) +
+  labs(title = "D",
+       x = "Gill Slit Height (% TL)", y = "CFAR") +
+  theme_classic() +
+  theme(legend.position = "none",
+        plot.title.position = "plot",
+        plot.title = element_text(face = "bold", size = 10),
+        axis.text.x = element_text(size = 8),
+        axis.title.x = element_text(size = 10),
+        axis.text.y = element_text(size = 8),
+        axis.title.y = element_text(size = 10),
+        plot.margin = unit(c(0, 0.1, 0, 0), "cm"))
+  
+gillHeight_plot
+
+# Because scaling on the x axis
+gill_mean <- mean(OGsharkData$ProportionalGillAverage, na.rm = TRUE)
+gill_sd   <- sd(OGsharkData$ProportionalGillAverage, na.rm = TRUE)
+
+# Modifying the breaks
+GillScaled_breaks <- c(-2, 0, 2, 4)
+
+GillLog_breaks <- GillScaled_breaks * gill_sd + gill_mean
+
+GillOriginal_breaks <- exp(GillLog_breaks)
+GillOriginal_breaks
+
+# Plot
+gillHeight_plot <- ggplot(gillSlit_epred_avg, aes(x = ProportionalGillAverage, y = .epred)) +
+  geom_line(aes(group = .draw), color = "#56696d", linewidth = 0.1, alpha = 0.1) +
+  geom_point(data = sharkData, aes(x = ProportionalGillAverage, y = CFAR),
+             alpha = 0.8, color = "#93A8AC", size = 2) +
+  stat_lineribbon(.width = 0, color = "#56696d", alpha = 0.5) + 
+  scale_x_continuous(
+    breaks = GillScaled_breaks,
+    labels = round(GillOriginal_breaks, 2)
+  ) +
+  labs(title = "D",
+       x = "Gill Slit Height (% TL)", y = "CFAR") +
+  theme_classic() +
+  theme(legend.position = "none",
+        plot.title.position = "plot",
+        plot.title = element_text(face = "bold", size = 10),
+        axis.text.x = element_text(size = 8),
+        axis.title.x = element_text(size = 10),
+        axis.text.y = element_text(size = 8),
+        axis.title.y = element_text(size = 10),
+        plot.margin = unit(c(0, 0.1, 0, 0), "cm"))
+  
+gillHeight_plot
+
+## Average Temperature ##
+# Tibble of results
+avgTemp <- tibble(
+  AvgTemperature = seq(
+    min(sharkData$AvgTemperature, na.rm = TRUE),
+    max(sharkData$AvgTemperature, na.rm = TRUE),
+    # Smooth the line
+    length.out = 200)
+  )
+
+# Expected values
+avgT_epred_draws <- add_epred_draws(avgTemp, avgT, ndraws = 100, 
+                                    re_formula = NA)
+
+# Plot
+avgT_plot <- ggplot(avgT_epred_draws, aes(x = AvgTemperature, y = .epred)) +
+  geom_line(aes(group = .draw), color = "#5d3233", linewidth = 0.1, alpha = 0.1) +
+  geom_point(data = sharkData, aes(x = AvgTemperature, y = CFAR),
+             alpha = 0.8, color = "#9B6A6C", size = 2) +
+  stat_lineribbon(.width = 0, color = "#5d3233", alpha = 0.5) + 
+  labs(title = "E",
+       x = "Average Temperature (\u00B0C)", y = "CFAR") +
+  theme_classic() +
+  theme(legend.position = "none",
+        plot.title.position = "plot",
+        plot.title = element_text(face = "bold", size = 10),
+        axis.text.x = element_text(size = 8),
+        axis.title.x = element_text(size = 10),
+        axis.text.y = element_text(size = 8),
+        axis.title.y = element_text(size = 10),
+        plot.margin = unit(c(0, 0.1, 0, 0), "cm"))
+  
+avgT_plot
+
+# Because scaling on the x axis
+temp_mean <- mean(OGsharkData$AvgTemperature, na.rm = TRUE)
+temp_sd   <- sd(OGsharkData$AvgTemperature, na.rm = TRUE)
+
+# Modifying the breaks
+TempScaled_breaks <- c(-2, -1, 0, 1, 2)
+
+TempLog_breaks <- TempScaled_breaks * temp_sd + temp_mean
+
+TempOriginal_breaks <- TempLog_breaks
+TempOriginal_breaks
+
+# Plot
+avgT_plot <- ggplot(avgT_epred_draws, aes(x = AvgTemperature, y = .epred)) +  
+  geom_line(aes(group = .draw), color = "#5d3233", linewidth = 0.1, alpha = 0.1) +
+  geom_point(data = sharkData, aes(x = AvgTemperature, y = CFAR),
+             alpha = 0.7, color = "#9B6A6C", size = 2) +
+  stat_lineribbon(.width = 0, color = "#5d3233", alpha = 0.5) +
+  scale_x_continuous(
+    breaks = TempScaled_breaks,
+    labels = round(TempOriginal_breaks, 1)
+  ) +
+  labs(title = "E",
+       x = "Average Temperature (\u00B0C)", y = "CFAR") +
+  theme_classic() +
+  theme(legend.position = "none",
+        plot.title.position = "plot",
+        plot.title = element_text(face = "bold", size = 10),
+        axis.text.x = element_text(size = 8),
+        axis.title.x = element_text(size = 10),
+        axis.text.y = element_text(size = 8),
+        axis.title.y = element_text(size = 10),
+        plot.margin = unit(c(0, 0.1, 0, 0), "cm"))
+  
+avgT_plot
+
+## Water Column Position ##
+waterCol_plot <- ggplot(data = sharkData, aes(x = WaterColumnPosition, y = CFAR, 
+                                              fill = WaterColumnPosition, 
+                                              color = WaterColumnPosition)) + 
+  geom_violin(alpha = 0.9) +
+  scale_fill_manual(values = c("Benthic" = "#103f4d",
+                               "Pelagic" = "#82e1da")) +
+  scale_color_manual(values = c("Benthic" = "#103f4d",
+                               "Pelagic" = "#82e1da")) +
+  labs(title = "F",
+       x = element_blank(), y = "CFAR") +
+  theme_classic() +
+  theme(legend.position = "none",
+        plot.title.position = "plot",
+        plot.title = element_text(face = "bold", size = 10),
+        axis.text.x = element_text(size = 8),
+        axis.title.x = element_text(size = 10),
+        axis.text.y = element_text(size = 8),
+        axis.title.y = element_text(size = 10),
+        plot.margin = unit(c(0, 0.1, 0, 0), "cm"))
+
+waterCol_plot
+```
+
+Arrange scatter plots and violin plot.
+
+```{r}
+spacer <- nullGrob()
+
+scatter_right_column <- arrangeGrob(spacer, maxBodySize_plot, spacer,
+                                    gillHeight_plot, spacer, avgT_plot, 
+                                    spacer, waterCol_plot,
+                                    ncol = 1, 
+                                    heights = c(0.05, 1, 0.01, 1, 0.01,
+                                                          1, 0.06, 1.21, 0.125))
+```
+
+```{r}
+# Combine plots
+Figure4 <- arrangeGrob(
+  brms_left_column,
+  spacer,
+  scatter_right_column,
+  ncol = 3,
+  widths = c(1.2, 0.05, 0.8)
+)
+
+# Save combined plot
+ggsave("Results/Figures/Fig4.tiff", 
+       plot = Figure4, units = "px",
+       device = "tiff",
+       width = 2250, height = 2500)
+```
