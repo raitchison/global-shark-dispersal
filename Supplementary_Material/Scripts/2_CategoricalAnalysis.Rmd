@@ -1,0 +1,273 @@
+---
+title: "2_CategoricalAnalysis"
+output: html_document
+---
+
+## Purpose
+
+Meaningfully reduce the number of categories for Water Column Position and Primary Habitat.
+phylopath only works with binary categorical variables.
+
+Also explore the correlation between Water Column Position and Habitat Use.
+
+```{r}
+# Load tidyverse for sanity
+library(tidyverse)
+
+# Load scico for plotting
+library(scico)
+
+# Load ape, geiger, nlme, and phytools for PGLS
+library(ape)
+library(geiger)
+library(nlme)
+library(phytools)
+```
+
+### Step 2: Load data
+
+```{r}
+# Load shark data
+categoricalData <- read.csv("Data/SharkData/TraitData.csv")
+```
+
+### Step 3: Compare pelagic, benthopelagic, and benthic water column position
+
+The first approach is to compare CFAR values for the three water column position levels:
+* Benthic
+* Benthopelagic
+* Pelagic
+
+We'll first visualize the spread of CFAR by water column position.
+
+```{r}
+positionPlot <- ggplot() +
+  geom_jitter(data = categoricalData, 
+              aes(x = WaterColumnPosition, y = CFAR,
+                  color = WaterColumnPosition), size = 2) +
+  labs(x = element_blank(),
+       y = "Caudal Fin Aspect Ratio (CFAR)") +
+  scale_colour_manual(values = c("Pelagic" = "#82e1da", 
+                               "Benthopelagic" = "#3b898e", 
+                               "Benthic" = "#103f4d")) +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 10),
+        axis.text.y = element_text(size = 10),
+        axis.title.y = element_text(size = 12),
+        legend.position = "none")
+
+positionPlot
+
+# Save plot
+ggsave("Supplementary_Material/Results/FigS2_.tiff",
+       plot = positionPlot, units = "px",
+       device = "tiff",
+       width = 1200, height = 1300, dpi = 300)
+```
+
+Now we'll statistically evaluate which category benthopelagic should be binned with.
+
+Biologically, we expect support for combining it with benthic.
+
+```{r}
+# Load phylogenetic trees
+# Read in all 500 trees
+sharkTrees <- read.nexus('Data/SharkData/PhyloTrees.nex')
+
+# Set the seed
+set.seed(125)
+
+# Sample out a single tree
+singleTree <- sample(sharkTrees, 1)[[1]]
+
+# Create correlation structure
+corBM <- corBrownian(phy = singleTree, form = ~ Genus_species)
+
+# Model 1: original three categories
+OGwaterCategories <- gls(CFAR ~ WaterColumnPosition, 
+            data = categoricalData, 
+            correlation = corBM,
+            method = "ML")
+
+summary(OGwaterCategories)
+
+# Model 2: benthopelagic > pelagic
+pelagicPosition <- categoricalData %>%
+  mutate(WaterColumnPosition = case_when(
+   str_detect(WaterColumnPosition, "Pelagic") ~ "Pelagic",
+   WaterColumnPosition == "Benthic" ~ "Benthic",
+   WaterColumnPosition == "Benthopelagic" ~ "Pelagic"))
+
+ToPelagic <- gls(CFAR ~ WaterColumnPosition, 
+            data = pelagicPosition, 
+            correlation = corBM,
+            method = "ML")
+
+summary(ToPelagic)
+
+# Model 3: benthopelagic > benthic
+benthicPosition <- categoricalData %>%
+  mutate(WaterColumnPosition = case_when(
+   str_detect(WaterColumnPosition, "Pelagic") ~ "Pelagic",
+   WaterColumnPosition == "Benthic" ~ "Benthic",
+   WaterColumnPosition == "Benthopelagic" ~ "Benthic"))
+
+ToBenthic <- gls(CFAR ~ WaterColumnPosition, 
+            data = benthicPosition, 
+            correlation = corBM,
+            method = "ML")
+
+summary(ToBenthic)
+
+# AIC comparison
+compareWaterColumnAIC <- data.frame(AIC(OGwaterCategories, ToPelagic, ToBenthic))
+
+compareWaterColumnAIC
+
+# Save AIC data frame as a csv
+write.csv(compareWaterColumnAIC, "Supplementary_Material/Results/TableS1_WaterPosition.csv",
+          row.names = TRUE)
+```
+
+## Step 4: Compare coastal, deepwater, and pelagic habitat use
+
+The second approach is to compare CFAR values for the three habitat use levels:
+* Coastal
+* Deepwater
+* Oceanic (Pelagic)
+
+Note: to avoid confusion with the water column position "Pelagic", we rename "Pelagic" to "Oceanic" for habitat use.
+
+We'll first visualize the spread of CFAR by habitat.
+
+```{r}
+categoricalData <- categoricalData %>%
+  mutate(PrimaryHabitat = case_when(
+   str_detect(PrimaryHabitat, "Pelagic") ~ "Oceanic",
+   PrimaryHabitat == "Deepwater" ~ "Deepwater",
+   PrimaryHabitat == "Coastal" ~ "Coastal"))
+
+habitat_order <- c("Deepwater", "Coastal", "Oceanic")
+
+habitatPlot <- ggplot() +
+  geom_jitter(data = categoricalData, 
+             aes(x = factor(PrimaryHabitat, levels = habitat_order), y = CFAR,
+                 color = PrimaryHabitat), size = 2) +
+  labs(x = element_blank(),
+       y = "Caudal Fin Aspect Ratio (CFAR)") +
+  scale_colour_manual(values = c("Oceanic" = "#97a55d", 
+                               "Coastal" = "#6a7132",
+                               "Deepwater" = "#3e4415")) +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 10),
+        axis.text.y = element_text(size = 10),
+        axis.title.y = element_text(size = 12),
+        legend.position = "none")
+
+habitatPlot
+
+# Save plot as a png
+ggsave("Supplementary_Material/Results/FigS3.tiff",
+       plot = habitatPlot, units = "px",
+       device = "tiff",
+       width = 1200, height = 1300, dpi = 300)
+```
+
+Now we'll statistically evaluate which category deepwater should be binned with.
+
+Biologically, we expect support for combining it with coastal.
+
+For clarity, we're also going to rename "Pelagic" to "Oceanic".
+
+```{r}
+# Model 1: original three categories
+OGhabitatCategories <- gls(CFAR ~ PrimaryHabitat, 
+            data = categoricalData, 
+            correlation = corBM,
+            method = "ML")
+
+summary(OGhabitatCategories)
+
+# Model 2: deepwater > coastal
+coastalUse <- categoricalData %>%
+  mutate(PrimaryHabitat = case_when(
+   str_detect(PrimaryHabitat, "Oceanic") ~ "Oceanic",
+   PrimaryHabitat == "Deepwater" ~ "Coastal",
+   PrimaryHabitat == "Coastal" ~ "Coastal"))
+
+ToCoastal <- gls(CFAR ~ PrimaryHabitat, 
+            data = coastalUse, 
+            correlation = corBM,
+            method = "ML")
+
+summary(ToCoastal)
+
+# Model 3: deepwater > oceanic
+oceanicUse <- categoricalData %>%
+  mutate(PrimaryHabitat = case_when(
+   str_detect(PrimaryHabitat, "Oceanic") ~ "Oceanic",
+   PrimaryHabitat == "Deepwater" ~ "Oceanic",
+   PrimaryHabitat == "Coastal" ~ "Coastal"))
+
+ToOceanic <- gls(CFAR ~ PrimaryHabitat, 
+            data = oceanicUse, 
+            correlation = corBM,
+            method = "ML")
+
+summary(ToOceanic)
+
+# AIC comparison
+compareHabitatAIC <- data.frame(AIC(OGhabitatCategories, ToCoastal, ToOceanic))
+
+compareHabitatAIC
+
+# Save AIC data frame as a csv
+write.csv(compareHabitatAIC, "Supplementary_Material/Results/TableS2_HabitatUse.csv",
+          row.names = TRUE)
+```
+
+## Step 5: Compare CFAR between the four combinations of habitat and water column position
+
+Now sharks should either be:
+* Oceanic X Pelagic
+* Oceanic X Benthic
+* Coastal X Pelagic
+* Coastal X Benthic
+
+We expect most sharks should be in Coastal X Benthic.
+
+```{r}
+catCondensed <- categoricalData %>%
+  # Benthopelagic > Benthic
+  mutate(WaterColumnPosition = case_when(
+   str_detect(WaterColumnPosition, "Pelagic") ~ "Pelagic",
+   WaterColumnPosition == "Benthic" ~ "Benthic",
+   WaterColumnPosition == "Benthopelagic" ~ "Benthic")) %>%
+  # Deepwater > Coastal
+  mutate(PrimaryHabitat = case_when(
+   str_detect(PrimaryHabitat, "Oceanic") ~ "Oceanic",
+   PrimaryHabitat == "Deepwater" ~ "Coastal",
+   PrimaryHabitat == "Coastal" ~ "Coastal"))
+
+habitatXwaterColumn <- ggplot(catCondensed, 
+                              aes(x = PrimaryHabitat, y = WaterColumnPosition, 
+                                  color = CFAR)) +
+  geom_jitter(size = 3, alpha = 0.8, width = 0.3, height = 0.3) +
+  scale_color_scico(palette = "corkO") +
+  theme_classic() +
+  labs(x = "Habitat Use",
+       y = "Water Column Position",
+       color = "CFAR") +
+  theme(legend.position = "inside",
+        legend.position.inside = c(0.92, 0.2))
+
+habitatXwaterColumn
+
+# Save plot
+ggsave("Supplementary_Material/Results/FigS4.tiff",
+       plot = habitatXwaterColumn, units = "px",
+       device = "tiff",
+       width = 1500, height = 1500, dpi = 300)
+```
+
+We see that most of the data falls into either Coastal X Benthic or Oceanic X Pelagic.
