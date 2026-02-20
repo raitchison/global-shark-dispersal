@@ -152,15 +152,17 @@ mean_CFAR_map <- ggplot() +
     limits = c(world_extent$ymin, world_extent$ymax),
     expand = c(0, 0)
   ) +
-  labs(subtitle = "A") +
   theme_minimal(base_size = 12) +
   theme(
     axis.text = element_blank(),
-    axis.title = element_blank(),
+    axis.title.x = element_blank(),
+    axis.title.y = element_text(size = 10),
     plot.subtitle = element_text(face = "bold", size = 10),
     legend.position = "none",
     plot.margin = unit(c(-0.1, 0, 0, 0), "cm")
-  )
+  ) +
+  labs(subtitle = "A",
+       y = "All Sharks")
 
 mean_CFAR_map
 
@@ -180,7 +182,7 @@ var_CFAR_map <- ggplot() +
   scale_y_continuous(
     limits = c(world_extent$ymin, world_extent$ymax),
     expand = c(0, 0)
-  ) +labs(subtitle = "B") +
+  ) + labs(subtitle = "B") +
   theme_minimal(base_size = 12) +
   theme(
     axis.text = element_blank(),
@@ -223,12 +225,14 @@ legend_plot_left <- ggplot() +
     limits = c(world_extent$ymin, world_extent$ymax),
     expand = c(0, 0)
   ) +
-  labs(subtitle = "A") +
+  labs(title = "A",
+       y = "All Sharks") +
   theme_minimal(base_size = 12) +
   theme(
     axis.text = element_blank(),
-    axis.title = element_blank(),
-    plot.subtitle = element_text(face = "bold", size = 12),
+    axis.title.x = element_blank(),,
+    axis.title.y = element_text(size = 10),
+    plot.title = element_text(face = "bold", size = 12),
     legend.direction = "horizontal",
     legend.background = element_rect(fill = "white", color = "transparent"),
     legend.key.width = unit(1.8, 'cm'),
@@ -265,7 +269,7 @@ legend_plot_right <- ggplot() +
     plot.subtitle = element_text(face = "bold", size = 12),
     legend.direction = "horizontal",
     legend.background = element_rect(fill = "white", color = "transparent"),
-    legend.key.width = unit(1.8, 'cm'),
+    legend.key.width = unit(1.75, 'cm'),
     legend.title = element_text(size = 12, hjust = 0.5),
     legend.title.position = "top",
     legend.text = element_text(size = 10),
@@ -348,13 +352,15 @@ mean_pelagic_map <- ggplot() +
   theme_minimal(base_size = 12) +
   theme(
     axis.text = element_blank(),
-    axis.title = element_blank(),
-    plot.title.position = "plot",
+    axis.title.x = element_blank(),,
+    axis.title.y = element_text(size = 10),
+    plot.title.position = "panel",
     plot.title = element_text(face = "bold", size = 10),
     legend.position = "none",
     plot.margin = unit(c(0, 0, 0, 0), "cm")
   ) +
-  labs(title = "C")
+  labs(title = "C",
+       y = "Pelagic Sharks")
 
 mean_pelagic_map
 
@@ -378,7 +384,7 @@ var_pelagic_map <- ggplot() +
   theme(
     axis.text = element_blank(),
     axis.title = element_blank(),
-    plot.title.position = "plot",
+    plot.title.position = "panel",
     plot.title = element_text(face = "bold", size = 10),
     legend.position = "none",
     plot.margin = unit(c(0, 0, 0, 0), "cm")) +
@@ -406,7 +412,6 @@ ranges_coastal <- ranges %>%
 tic("Coastal species: range–hex intersection")
 range_intersect_hex_coastal <- st_intersects(ranges_coastal, hex)
 toc()
-
 
 range_hex_df_coastal <- tibble(
   species_index = rep(
@@ -457,13 +462,15 @@ mean_coastal_map <- ggplot() +
   theme_minimal(base_size = 12) +
   theme(
     axis.text = element_blank(),
-    axis.title = element_blank(),
-    plot.title.position = "plot",
+    axis.title.x = element_blank(),,
+    axis.title.y = element_text(size = 10),
+    plot.title.position = "panel",
     plot.title = element_text(face = "bold", size = 10),
     legend.position = "none",
     plot.margin = unit(c(0, 0, 0, 0), "cm")
   ) +
-  labs(title = "E")
+  labs(title = "E",
+       y = "Coastal Sharks")
 
 mean_coastal_map
 
@@ -487,7 +494,7 @@ var_coastal_map <- ggplot() +
   theme(
     axis.text = element_blank(),
     axis.title = element_blank(),
-    plot.title.position = "plot",
+    plot.title.position = "panel",
     plot.title = element_text(face = "bold", size = 10),
     legend.position = "none",
     plot.margin = unit(c(0, 0, 0, 0), "cm")) +
@@ -515,7 +522,6 @@ ranges_deepwater <- ranges %>%
 tic("Deepwater species: range–hex intersection")
 range_intersect_hex_deepwater <- st_intersects(ranges_deepwater, hex)
 toc()
-
 
 range_hex_df_deepwater <- tibble(
   species_index = rep(
@@ -566,13 +572,15 @@ mean_deepwater_map <- ggplot() +
   theme_minimal(base_size = 12) +
   theme(
     axis.text = element_blank(),
-    axis.title = element_blank(),
-    plot.title.position = "plot",
+    axis.title.x = element_blank(),,
+    axis.title.y = element_text(size = 10),
+    plot.title.position = "panel",
     plot.title = element_text(face = "bold", size = 10),
     legend.position = "none",
     plot.margin = unit(c(0, 0, -0.2, 0), "cm")
   ) +
-  labs(title = "G")
+  labs(title = "G",
+       y = "Deepwater Sharks")
 
 mean_deepwater_map
 
@@ -607,6 +615,8 @@ var_deepwater_map
 Combine all plots.
 
 ```{r}
+spacer <- nullGrob()
+
 left_column <- arrangeGrob(
   legend_left,
   arrangeGrob(mean_CFAR_map, mean_pelagic_map,
@@ -624,10 +634,11 @@ right_column <- arrangeGrob(
 )
 
 Figure2 <- arrangeGrob(
+  spacer,
   left_column,
   right_column,
-  ncol = 2,
-  widths = c(1, 1)
+  ncol = 3,
+  widths = c(0.01, 1, 0.9)
 )
 
 ggsave("Results/Figures/Fig2.tiff", 
