@@ -15,5 +15,6 @@ Code for "Global patterns and drivers of dispersal potential in sharks" by Aitch
   - Figures
   - Tables
 * Supplementary_Material
+  - Data
   - Results
   - Scripts
