@@ -1,0 +1,79 @@
+---
+title: "X_phylogeneticAnalysis"
+output: html_document
+---
+
+## Purpose
+
+To resolve taxonomic differences between different data files and VertLife trees.
+
+### Step 1: Load libraries
+
+Load the libraries used.
+
+```{r}
+# Load tidyverse for sanity
+library(tidyverse)
+
+# Load phytools, ape, and geiger for working with phylogenetic trees
+library(phytools)
+library(ape)
+library(geiger)
+
+# Load ggtree and ggtreeExtrafor plotting phylogenetic tree
+library(ggtree)
+library(ggtreeExtra)
+
+# Load scico 
+library(scico)
+```
+
+### Step 2: Load files
+
+Load:
+* Nexus file (PhyloTrees.nex) 
+* Shark trait data (TraitData.csv)
+
+```{r}
+# Read the tree file
+Trees <- read.nexus("Data/SharkData/PhyloTrees.nex")
+
+# Use read.csv to load shark trait data
+sharkData <- read.csv("Data/SharkData/TraitData.csv")
+```
+
+### Step 3: Sample a tree and make sure they match
+
+```{r}
+# Set seed for reproducability
+set.seed(123)
+
+# Sample a single tree from Trees
+sharkTree <- sample(Trees, 1)[[1]]
+
+# Set row names as species names
+rownames(sharkData) <- sharkData$Genus_species
+
+# Check species with setdiff (should return "character (0)")
+setdiff(sharkTree$tip.label, sharkData$Genus_species)
+```
+
+### Step 4: Plot phylogenetic tree
+
+```{r}
+phyloTree <- ggtree(sharkTree) +
+  geom_fruit(
+    data = sharkData,
+    geom = geom_bar,
+    mapping = aes(y = Genus_species, x = CFAR, fill = CFAR),
+    orientation = "y",
+    stat = "identity",
+    pwidth = 0.1
+  ) +
+  scale_fill_scico(palette = "corkO") +
+  theme(legend.position = "inside",
+        legend.position.inside = c(0.1, 0.8))
+
+phyloTree
+```
+
