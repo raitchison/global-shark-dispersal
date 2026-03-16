@@ -31,6 +31,7 @@ library(tidybayes)
 # Load packages  for plotting
 library(scales)
 library(cowplot)
+library(png)
 ```
 
 ## Step 2: Load data and phylogenetic trees
@@ -193,19 +194,19 @@ speedPlot <- ggplot(swim_epred_draws, aes(x = CFAR, y = .epred)) +
   stat_lineribbon(.width = 0, color = "#dbb6bd", alpha = 0.5) +  
   geom_line(aes(group = .draw), color = "#dbb6bd", linewidth = 0.1, alpha = 0.1) +
   geom_point(data = jacobyData, aes(x = CFAR, y = speed),
-             alpha = 0.8, color = "#b37c86", size = 2) +
+             alpha = 0.5, color = "#b37c86", size = 1.5) +
   ylim(0,1.5) +
-  labs(#title = "A",
+  labs(#title = "B",
        x = "Caudal Fin Aspect Ratio", 
        y = bquote('Swimming speed ('*m%.%s^{-1}*')')) +
   theme_classic() +
   theme(legend.position = "none",
         # plot.title.position = "plot",
         # plot.title = element_text(face = "bold", size = 10),
-        axis.text.x = element_text(size = 8),
-        axis.title.x = element_text(size = 10),
-        axis.text.y = element_text(size = 8),
-        axis.title.y = element_text(size = 10),
+        axis.text.x = element_text(size = 5),
+        axis.title.x = element_text(size = 7),
+        axis.text.y = element_text(size = 5),
+        axis.title.y = element_text(size = 7),
         plot.margin = unit(c(0.02, 0.17, 0, 0), "cm"))
 
 speedPlot
@@ -292,22 +293,24 @@ rangePlot <- ggplot(geo_epred_draws, aes(x = CFAR, y = .epred)) +
   stat_lineribbon(.width = 0, color = "#775d8c", alpha = 0.5) +  
   geom_line(aes(group = .draw), color = "#775d8c", linewidth = 0.1, alpha = 0.1) +
   geom_point(data = sharkData, aes(x = CFAR, y = area_sqkm),
-             alpha = 0.8, color = "#2e193f", size = 2) +
+             alpha = 0.5, color = "#2e193f", size = 1.5) +
   scale_y_log10(# Set breaks at specific orders of magnitude
     breaks = trans_breaks("log10", function(x) 10^x),
     # Format labels nicely as scientific notation
     labels = trans_format("log10", math_format(10^.x))) +
-  labs(#title = "B",
+  scale_x_continuous(breaks = c(1, 2, 3, 4, 5), 
+                     labels = c(1, 2, 3, 4, 5)) +
+  labs(# title = "C",
        x = "Caudal Fin Aspect Ratio", 
        y = bquote('Geographic Range ('*km^{2}*')')) +
   theme_classic() +
   theme(legend.position = "none",
         # plot.title.position = "plot",
         # plot.title = element_text(face = "bold", size = 10),
-        axis.text.x = element_text(size = 8),
-        axis.title.x = element_text(size = 10),
-        axis.text.y = element_text(size = 8),
-        axis.title.y = element_text(size = 10))
+        axis.text.x = element_text(size = 5),
+        axis.title.x = element_text(size = 7),
+        axis.text.y = element_text(size = 5),
+        axis.title.y = element_text(size = 7))
 
 rangePlot
 ```
@@ -323,22 +326,35 @@ Which are missing geographic range data.
 Now, arrange plots and save.
 
 ```{r}
+# Upload panel A (CFAR diagram)
+panelA_image <- readPNG("Plot_Inserts/Figure1A.png")
+
+panelA <- ggdraw() +
+  draw_image(panelA_image, scale = 1)
+
+panelA
+```
+
+
+```{r}
 # Align plots by y-axis
 aligned <- align_plots(speedPlot, rangePlot, align = "v", axis = "l")
 
 # Arrange plots
 Figure1 <- plot_grid(
+  panelA,
   aligned[[1]],
   aligned[[2]],
   ncol = 1,
-  labels = c("A", "B"),
-  label_size = 10
+  labels = c("A", "B", "C"),
+  label_size = 8
 )
 
 # Save as Fig 1
 ggsave("Results/Figures/Fig1.tiff", 
        plot = Figure1, units = "px",
        device = "tiff",
-       width = 1560, height = 1600,
+       bg = "white",
+       width = 700, height = 1500,
        dpi = 300)
 ```
