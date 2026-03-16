@@ -22,6 +22,11 @@ library(ape)
 
 # Load phylopath for analysis
 library(phylopath)
+
+# Load libraries for combining plots
+library(cowplot)
+library(gridExtra)
+library(grid)
 ```
 
 ### Step 2: Load data and create models to compare
@@ -42,7 +47,7 @@ sharkData <- read.csv("Data/SharkData/TraitData.csv") %>%
    PrimaryHabitat == "Coastal" ~ "Coastal"))
 ```
 
-Create model structure
+Create model structure.
 
 ```{r}
 # Rename columns for displaying with phylopath
@@ -186,40 +191,47 @@ best_positions <- data.frame(
            'CFAR'),
   x = c(10, 
         10, 
-        3.8, 
-        17.4,
+        3, 
+        17.5,
         13.3),
-  y = c(7, 
+  y = c(7.8, 
         5.5, 
         2.9, 
         3.8,
         1))
 
 # Plot the best model
-bestModel <- plot(best_model, manual_layout = best_positions,
-                  edge_width = 0.75,
+bestModelPlot <- plot(best_model, manual_layout = best_positions,
+                  edge_width = 0.75, text_size = 7,
                   box_x = 27, box_y = 8, curvature = 0.05) +
                   ggplot2::xlim(0, 20) +
                   ggplot2::theme(legend.position = "inside",
                                  legend.position.inside = c(0.9, 0.85))
 
-bestModel
+bestModelPlot <- plot(best_model, manual_layout = best_positions,
+                  edge_width = 0.6, text_size = 3,
+                  box_x = 15, box_y = 5, curvature = 0.05) +
+                  ggplot2::xlim(0, 20) +
+                  ggplot2::theme(legend.position = "none",
+                                 text = element_text(size = 7)) +
+                  ggplot2::annotate("text", x = 12.1, y = 6.5,
+                                    label = "Negative",
+                                    color = "firebrick", size = 2.5) +
+                  ggplot2::annotate("text", x = 17.1, y = 4.55,
+                                    label = "Positive",
+                                    color = "navy", size = 2.5) +
+                  ggplot2::annotate("text", x = 10, y = 0.5,
+                                    label = "CICc:29.97, p-value: 0.51",
+                                    color = "black", size = 3)
 
-# Save best model plot as a png
-ggsave("Results/Figures/Fig3.tiff",
-       plot = bestModel, units = "px",
-       device = "tiff",
-       width = 1560, height = 1600,
-       dpi = 300)
+bestModelPlot
 ```
 
 ```{r}
-# Visually inspect best_model
-best_model
-
+# Create the coefficient plot
 bestModelTable <- as.data.frame(best_model$coef)
 
-labels <- c(
+pathLabels <- c(
   "GillHeight -> CFAR",
   "MaxBodySize -> CFAR",
   "MaxBodySize -> GillHeight",
@@ -230,20 +242,53 @@ labels <- c(
 )
 
 # Plot coefficients
-coefficient_plot <- coef_plot(best_model, error_bar = "se", 
-                              order_by = "strength", reverse_order = TRUE) +
+coef_plot(best_model, error_bar = "se", 
+          order_by = "strength") +
   ggplot2::coord_flip() +
   ggplot2::theme_classic() +
   ggplot2::labs(y = "Standardized Path Coefficient") +
-  ggplot2::scale_x_discrete(labels = labels)
+  ggplot2::scale_x_discrete(labels = pathLabels)
 
-coefficient_plot
+# Set custom colors based on coefficients
+coef_colors <- c("firebrick",
+                 "navy",
+                 "navy",
+                 "navy",
+                 "navy",
+                 "navy",
+                 "navy")
 
-# Save coefficient plot as a png
-ggsave("Supplementary_Material/Results/FigS11.tiff",
-       plot = coefficient_plot,units = "px",
+
+coeffPlot <- coef_plot(best_model, error_bar = "se", 
+                              order_by = "strength") +
+  ggplot2::coord_flip() + 
+	ggplot2::theme_classic() +
+	ggplot2::geom_errorbar(size = 0.5, color = "black", width = 0.3) +
+	ggplot2::geom_point(size = 3, color = coef_colors) +
+  ggplot2::labs(y = "Standardized Path Coefficient") +
+  ggplot2::theme(axis.title = element_text(size = 7),
+                 axis.text = element_text(size = 5))
+
+coeffPlot
+```
+
+```{r}
+# Combine plots and save
+Figure3 <- plot_grid(
+  bestModelPlot, coeffPlot,
+  ncol = 2,
+  rel_widths = c(0.9, 1),
+  labels = c("a", "b"),
+  label_size = 8
+)
+
+Figure3
+
+# Save best model plot as a png
+ggsave("Results/Figures/Fig3.tiff",
+       plot = Figure3, units = "px",
        device = "tiff",
-       width = 1560, height = 1600,
+       width = 2160, height = 1450,
        dpi = 300)
 ```
 
