@@ -194,7 +194,7 @@ speedPlot <- ggplot(swim_epred_draws, aes(x = CFAR, y = .epred)) +
   stat_lineribbon(.width = 0, color = "#dbb6bd", alpha = 0.5) +  
   geom_line(aes(group = .draw), color = "#dbb6bd", linewidth = 0.1, alpha = 0.1) +
   geom_point(data = jacobyData, aes(x = CFAR, y = speed),
-             alpha = 0.5, color = "#b37c86", size = 1.5) +
+             alpha = 0.5, color = "#b37c86", size = 1) +
   ylim(0,1.5) +
   labs(#title = "B",
        x = "Caudal Fin Aspect Ratio", 
@@ -204,9 +204,9 @@ speedPlot <- ggplot(swim_epred_draws, aes(x = CFAR, y = .epred)) +
         # plot.title.position = "plot",
         # plot.title = element_text(face = "bold", size = 10),
         axis.text.x = element_text(size = 5),
-        axis.title.x = element_text(size = 7),
+        axis.title.x = element_text(size = 6),
         axis.text.y = element_text(size = 5),
-        axis.title.y = element_text(size = 7),
+        axis.title.y = element_text(size = 6),
         plot.margin = unit(c(0.02, 0.17, 0, 0), "cm"))
 
 speedPlot
@@ -293,7 +293,7 @@ rangePlot <- ggplot(geo_epred_draws, aes(x = CFAR, y = .epred)) +
   stat_lineribbon(.width = 0, color = "#775d8c", alpha = 0.5) +  
   geom_line(aes(group = .draw), color = "#775d8c", linewidth = 0.1, alpha = 0.1) +
   geom_point(data = sharkData, aes(x = CFAR, y = area_sqkm),
-             alpha = 0.5, color = "#2e193f", size = 1.5) +
+             alpha = 0.5, color = "#2e193f", size = 1) +
   scale_y_log10(# Set breaks at specific orders of magnitude
     breaks = trans_breaks("log10", function(x) 10^x),
     # Format labels nicely as scientific notation
@@ -308,9 +308,9 @@ rangePlot <- ggplot(geo_epred_draws, aes(x = CFAR, y = .epred)) +
         # plot.title.position = "plot",
         # plot.title = element_text(face = "bold", size = 10),
         axis.text.x = element_text(size = 5),
-        axis.title.x = element_text(size = 7),
+        axis.title.x = element_text(size = 6),
         axis.text.y = element_text(size = 5),
-        axis.title.y = element_text(size = 7))
+        axis.title.y = element_text(size = 6))
 
 rangePlot
 ```
@@ -346,7 +346,8 @@ Figure1 <- plot_grid(
   aligned[[1]],
   aligned[[2]],
   ncol = 1,
-  labels = c("A", "B", "C"),
+  rel_heights = c(0.5, 1, 1),
+  labels = c("a", "b", "c"),
   label_size = 8
 )
 
@@ -355,6 +356,6 @@ ggsave("Results/Figures/Fig1.tiff",
        plot = Figure1, units = "px",
        device = "tiff",
        bg = "white",
-       width = 700, height = 1500,
+       width = 700, height = 1400,
        dpi = 300)
 ```
