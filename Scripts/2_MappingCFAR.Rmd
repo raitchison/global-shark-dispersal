@@ -156,12 +156,12 @@ mean_CFAR_map <- ggplot() +
   theme(
     axis.text = element_blank(),
     axis.title.x = element_blank(),
-    axis.title.y = element_text(size = 10),
-    plot.subtitle = element_text(face = "bold", size = 10),
+    axis.title.y = element_text(size = 7),
+    plot.subtitle = element_text(face = "bold", size = 8),
     legend.position = "none",
     plot.margin = unit(c(-0.1, 0, 0, 0), "cm")
   ) +
-  labs(subtitle = "A",
+  labs(subtitle = "a",
        y = "All Sharks")
 
 mean_CFAR_map
@@ -182,12 +182,12 @@ var_CFAR_map <- ggplot() +
   scale_y_continuous(
     limits = c(world_extent$ymin, world_extent$ymax),
     expand = c(0, 0)
-  ) + labs(subtitle = "B") +
+  ) + labs(subtitle = "b") +
   theme_minimal(base_size = 12) +
   theme(
     axis.text = element_blank(),
     axis.title = element_blank(),
-    plot.subtitle = element_text(face = "bold", size = 10),
+    plot.subtitle = element_text(face = "bold", size = 8),
     legend.position = "none",
     plot.margin = unit(c(-0.1, 0, 0, 0), "cm")
   )
@@ -225,20 +225,20 @@ legend_plot_left <- ggplot() +
     limits = c(world_extent$ymin, world_extent$ymax),
     expand = c(0, 0)
   ) +
-  labs(title = "A",
+  labs(title = "a",
        y = "All Sharks") +
   theme_minimal(base_size = 12) +
   theme(
     axis.text = element_blank(),
     axis.title.x = element_blank(),,
-    axis.title.y = element_text(size = 10),
-    plot.title = element_text(face = "bold", size = 12),
+    axis.title.y = element_text(size = 7),
+    plot.title = element_text(face = "bold", size = 8),
     legend.direction = "horizontal",
     legend.background = element_rect(fill = "white", color = "transparent"),
     legend.key.width = unit(1.8, 'cm'),
-    legend.title = element_text(size = 12, hjust = 0.5),
+    legend.title = element_text(size = 7, hjust = 0.5),
     legend.title.position = "top",
-    legend.text = element_text(size = 10),
+    legend.text = element_text(size = 6),
     plot.margin = unit(c(0, 0, 0, 0), "cm")
   )
 
@@ -261,18 +261,18 @@ legend_plot_right <- ggplot() +
   scale_y_continuous(
     limits = c(world_extent$ymin, world_extent$ymax),
     expand = c(0, 0)) +
-  labs(subtitle = "E") +
+  labs(subtitle = "b") +
   theme_minimal(base_size = 12) +
   theme(
     axis.text = element_blank(),
     axis.title = element_blank(),
-    plot.subtitle = element_text(face = "bold", size = 12),
+    plot.subtitle = element_text(face = "bold", size = 8),
     legend.direction = "horizontal",
     legend.background = element_rect(fill = "white", color = "transparent"),
-    legend.key.width = unit(1.75, 'cm'),
-    legend.title = element_text(size = 12, hjust = 0.5),
+    legend.key.width = unit(1.8, 'cm'),
+    legend.title = element_text(size = 7, hjust = 0.5),
     legend.title.position = "top",
-    legend.text = element_text(size = 10),
+    legend.text = element_text(size = 6),
     plot.margin = unit(c(0, 0, 0, 0), "cm")
   )
 
@@ -352,14 +352,14 @@ mean_pelagic_map <- ggplot() +
   theme_minimal(base_size = 12) +
   theme(
     axis.text = element_blank(),
-    axis.title.x = element_blank(),,
-    axis.title.y = element_text(size = 10),
+    axis.title.x = element_blank(),
+    axis.title.y = element_text(size = 7),
     plot.title.position = "panel",
-    plot.title = element_text(face = "bold", size = 10),
+    plot.title = element_text(face = "bold", size = 8),
     legend.position = "none",
     plot.margin = unit(c(0, 0, 0, 0), "cm")
   ) +
-  labs(title = "C",
+  labs(title = "c",
        y = "Pelagic Sharks")
 
 mean_pelagic_map
@@ -385,10 +385,10 @@ var_pelagic_map <- ggplot() +
     axis.text = element_blank(),
     axis.title = element_blank(),
     plot.title.position = "panel",
-    plot.title = element_text(face = "bold", size = 10),
+    plot.title = element_text(face = "bold", size = 8),
     legend.position = "none",
     plot.margin = unit(c(0, 0, 0, 0), "cm")) +
-  labs(title = "D")
+  labs(title = "d")
 
 var_pelagic_map
 ```
@@ -463,13 +463,13 @@ mean_coastal_map <- ggplot() +
   theme(
     axis.text = element_blank(),
     axis.title.x = element_blank(),,
-    axis.title.y = element_text(size = 10),
+    axis.title.y = element_text(size = 7),
     plot.title.position = "panel",
-    plot.title = element_text(face = "bold", size = 10),
+    plot.title = element_text(face = "bold", size = 8),
     legend.position = "none",
     plot.margin = unit(c(0, 0, 0, 0), "cm")
   ) +
-  labs(title = "E",
+  labs(title = "e",
        y = "Coastal Sharks")
 
 mean_coastal_map
@@ -495,10 +495,10 @@ var_coastal_map <- ggplot() +
     axis.text = element_blank(),
     axis.title = element_blank(),
     plot.title.position = "panel",
-    plot.title = element_text(face = "bold", size = 10),
+    plot.title = element_text(face = "bold", size = 8),
     legend.position = "none",
     plot.margin = unit(c(0, 0, 0, 0), "cm")) +
-  labs(title = "F")
+  labs(title = "f")
 
 var_coastal_map
 ```
@@ -573,13 +573,13 @@ mean_deepwater_map <- ggplot() +
   theme(
     axis.text = element_blank(),
     axis.title.x = element_blank(),,
-    axis.title.y = element_text(size = 10),
+    axis.title.y = element_text(size = 7),
     plot.title.position = "panel",
-    plot.title = element_text(face = "bold", size = 10),
+    plot.title = element_text(face = "bold", size = 8),
     legend.position = "none",
     plot.margin = unit(c(0, 0, -0.2, 0), "cm")
   ) +
-  labs(title = "G",
+  labs(title = "g",
        y = "Deepwater Sharks")
 
 mean_deepwater_map
@@ -604,10 +604,10 @@ var_deepwater_map <- ggplot() +
   theme(
     axis.text = element_blank(),
     axis.title = element_blank(),
-    plot.subtitle = element_text(face = "bold", size = 10),
+    plot.subtitle = element_text(face = "bold", size = 8),
     legend.position = "none",
     plot.margin = unit(c(0, 0, 0, 0), "cm")) +
-  labs(subtitle = "H")
+  labs(subtitle = "h")
 
 var_deepwater_map
 ```
@@ -636,13 +636,15 @@ right_column <- arrangeGrob(
 Figure2 <- arrangeGrob(
   spacer,
   left_column,
+  spacer,
   right_column,
-  ncol = 3,
-  widths = c(0.01, 1, 0.9)
+  ncol = 4,
+  widths = c(0.01, 0.9, 0.01, 0.9)
 )
 
 ggsave("Results/Figures/Fig2.tiff", 
        plot = Figure2, units = "px",
        device = "tiff",
+       bg = "white",
        width = 2250, height = 2000, dpi = 300)
 ```
