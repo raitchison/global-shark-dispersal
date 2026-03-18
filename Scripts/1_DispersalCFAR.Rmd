@@ -340,14 +340,18 @@ panelA
 # Align plots by y-axis
 aligned <- align_plots(speedPlot, rangePlot, align = "v", axis = "l")
 
+# Create spacer
+space <- nullGrob()
+
 # Arrange plots
 Figure1 <- plot_grid(
   panelA,
+  space,
   aligned[[1]],
   aligned[[2]],
   ncol = 1,
-  rel_heights = c(0.5, 1, 1),
-  labels = c("a", "b", "c"),
+  rel_heights = c(0.5, 0.02, 1, 1),
+  labels = c("a", "", "b", "c"),
   label_size = 8
 )
 
