@@ -1,0 +1,65 @@
+---
+title: "X_threatStatus"
+output: html_document
+---
+
+## Purpose
+
+To visualize CFAR by IUCN category.
+
+### Step 1: Load libraries
+
+Load the libraries used.
+
+```{r}
+# Load tidyverse for dplyr and ggplot2
+library(tidyverse)
+
+# Load packages  for plotting
+library(cowplot)
+library(png)
+```
+
+```{r}
+# Use read.csv to load shark files
+sharkData <- read.csv("Data/SharkData/TraitData.csv")
+```
+
+```{r}
+## IUCN Category ##
+sharkData$IUCNcategory <- factor(sharkData$IUCNcategory,
+                                 levels = c("DD", "LC", "NT", "VU", "EN", "CR"))
+
+IUCNplot <- ggplot(data = sharkData, aes(x = IUCNcategory, y = CFAR, 
+                                              # fill = IUCNcategory, 
+                                              color = IUCNcategory)) + 
+  geom_violin(alpha = 0.1) +
+  geom_jitter(alpha = 0.7, size = 2.5) +
+  # scale_fill_manual(values = c("DD" = "#d1d1c6",
+  #                              "LC" = "#60c65a",
+  #                              "NT" = "#cce22c",
+  #                              "VU" = "#f9e911",
+  #                              "EN" = "#fb803f",
+  #                              "CR" = "#d62205")) +
+  scale_color_manual(values = c("DD" = "#d1d1c6",
+                               "LC" = "#60c65a",
+                               "NT" = "#cce22c",
+                               "VU" = "#f9e911",
+                               "EN" = "#fb803f",
+                               "CR" = "#d62205")) +
+  labs(x = "", y = "CFAR") +
+  theme_classic() +
+  theme(legend.position = "none",
+        axis.text = element_text(size = 6),
+        axis.title = element_text(size = 7),
+        plot.margin = unit(c(0, 0, 0, 0), "cm"))
+
+IUCNplot
+
+# Save plot as a png
+ggsave("Supplementary_Material/Results/FigSX.tiff",
+       plot = IUCNplot, units = "px",
+       device = "tiff",
+       width = 1200, height = 1300, dpi = 300)
+```
+
