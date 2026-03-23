@@ -201,7 +201,7 @@ var_hex_plot
 
 ```{r}
 # Arrange plots
-FigureXX <- plot_grid(
+Figure4 <- plot_grid(
   mean_hex_plot,
   var_hex_plot,
   ncol = 1,
@@ -210,7 +210,7 @@ FigureXX <- plot_grid(
   label_size = 8
 )
 
-ggsave("Results/Figures/FigXX.tiff", FigureXX, 
+ggsave("Results/Figures/Fig4.tiff", Figure4, 
        units = "px",
        device = "tiff",
        width = 1600, height = 1400, dpi = 300)

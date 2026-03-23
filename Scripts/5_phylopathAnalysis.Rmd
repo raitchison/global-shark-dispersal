@@ -263,7 +263,7 @@ coeffPlot <- coef_plot(best_model, error_bar = "se",
                               order_by = "strength") +
   ggplot2::coord_flip() + 
 	ggplot2::theme_classic() +
-	ggplot2::geom_errorbar(size = 0.5, color = "black", width = 0.3) +
+	ggplot2::geom_errorbar(size = 0.5, color = "black", width = 0) +
 	ggplot2::geom_point(size = 3, color = coef_colors) +
   ggplot2::labs(y = "Standardized Path Coefficient") +
   ggplot2::theme(axis.title = element_text(size = 7),
@@ -274,19 +274,19 @@ coeffPlot
 
 ```{r}
 # Combine plots and save
-Figure3 <- plot_grid(
+Figure5 <- plot_grid(
   bestModelPlot, coeffPlot,
   ncol = 2,
-  rel_widths = c(0.9, 1),
+  rel_widths = c(0.9, 1.1),
   labels = c("a", "b"),
   label_size = 8
 )
 
-Figure3
+Figure5
 
 # Save best model plot as a png
-ggsave("Results/Figures/Fig3.tiff",
-       plot = Figure3, units = "px",
+ggsave("Results/Figures/Fig5.tiff",
+       plot = Figure5, units = "px",
        device = "tiff",
        width = 2160, height = 1450,
        dpi = 300)

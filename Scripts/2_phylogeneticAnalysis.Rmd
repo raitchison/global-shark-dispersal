@@ -346,7 +346,8 @@ phyloTreeFinal
 ```
 
 ```{r}
-ggsave("Results/Figures/FigX.png", phyloTreeFinal, units = "px",
+ggsave("Results/Figures/Fig2.tiff", phyloTreeFinal, units = "px",
+       device = "tiff",
        width = 2000, height = 2350, dpi = 300)
 ```
 

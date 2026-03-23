@@ -31,11 +31,13 @@ library(tidybayes)
 # Load DHARMa for visualizing model fit
 library(DHARMa)
 
-# Load ggtext and gridExtra  for plotting
+# Load packages  for plotting
 library(ggtext)
 library(cowplot)
+library(patchwork)
 library(gridExtra)
 library(grid)
+library(png)
 ```
 
 ## Step 2: Load data and phylogenetic trees
@@ -300,15 +302,14 @@ contPlot <- ggplot(continuousCoefs,
                        y = fct_rev(fct_reorder(term, estimate, .desc = TRUE)),
                        fill = term)) +
   stat_halfeye(.width = c(0.95), point_interval = mean_qi,
-               scale = .69) +
+               scale = .7) +
   geom_vline(xintercept = 0, linetype = "dashed", color = "grey50") +
   scale_fill_manual(values = c("Gill Slit Height" = "#93A8AC",
                                "Average Temperature" = "#9B6A6C",
                                "Maximum Body Size" = "#424B54")) +
   xlim(-0.45, 0.7) +
   scale_y_discrete(expand = expansion(mult = c(0.15, 0))) +
-  labs(x = "Coefficient Estimate",
-       title = "a") +
+  labs(x = "Coefficient Estimate") +
   theme_classic() +
   theme(axis.text.x = element_text(size = 6),
         axis.title.x = element_text(size = 7),
@@ -319,24 +320,77 @@ contPlot <- ggplot(continuousCoefs,
         plot.title.position = "plot",
         plot.title = element_text(face = "bold", size = 8),
         plot.margin = unit(c(-0.01, 0.25, 0, 0.15), "cm")) +
-  geom_richtext(
-    data = contLabels,
-    aes(x = estimate, y = term, label = label),
-    inherit.aes = FALSE,
-    hjust = 0.5,
-    size = 2.5,
-    vjust = 1.25,
-    fill = "white",
-    label.color = NA
-  ) +
-  geom_segment(aes(x = -0.1093399, xend = -0.1093399, y = 1.06, yend = 1.65), 
+  # geom_richtext(
+  #   data = contLabels,
+  #   aes(x = estimate, y = term, label = label),
+  #   inherit.aes = FALSE,
+  #   hjust = 0.5,
+  #   size = 2.5,
+  #   vjust = 1.25,
+  #   fill = "white",
+  #   label.color = NA
+  # ) +
+  geom_segment(aes(x = -0.1093399, xend = -0.1093399, y = 1.02, yend = 1.7), 
                color = "#FFFFFF") +
-  geom_segment(aes(x = 0.1366995, xend = 0.1366995, y = 2.06, yend = 2.7), 
+  geom_segment(aes(x = 0.1366995, xend = 0.1366995, y = 2.02, yend = 2.7), 
                color = "#FFFFFF") +
-  geom_segment(aes(x = 0.1527054, xend = 0.1527054, y = 3.06, yend = 3.6), 
-               color = "#FFFFFF")
+  geom_segment(aes(x = 0.1527054, xend = 0.1527054, y = 3.02, yend = 3.7), 
+               color = "#FFFFFF") +
+  annotate("text", x = -0.109, y = 0.96, label = "-0.11", size = 5, color = "#9B6A6C") +
+  annotate("text", x = 0.136, y = 1.96, label = "0.14", size = 5, color = "#93A8AC") +
+  annotate("text", x = 0.153, y = 2.96, label = "0.15", size = 5, color = "#424B54") +
+  annotate("text", x = -0.01, y = 0.96, label = "0", size = 4, color = "grey50") +
+  annotate("text", x = 0.01, y = 1.96, label = "0", size = 4, color = "grey50") +
+  annotate("text", x = 0.01, y = 2.96, label = "0", size = 4, color = "grey50")
 
 contPlot
+```
+
+Grab insets.
+
+```{r}
+tempInset <- contPlot + 
+  coord_cartesian(xlim = c(-0.24, 0.1), ylim = c(0.95, 1.5)) +
+  theme_void() +
+  labs(title = "") +
+  theme(legend.position = "none")
+
+tempInset <- ggplotGrob(tempInset)
+
+ggsave("Results/brmsOutputs/tempInset.png", tempInset,
+       width = 5, height = 5, dpi = 300, bg = "transparent")
+
+gillInset <- contPlot +
+  coord_cartesian(xlim = c(-0.11, 0.36), ylim = c(2, 2.7)) +
+  theme_void() +
+  labs(title = "") +
+  theme(legend.position = "none")
+
+gillInset <- ggplotGrob(gillInset)
+
+ggsave("Results/brmsOutputs/gillInset.png", gillInset,
+       width = 5, height = 5, dpi = 300, bg = "transparent")
+
+bodyInset <- contPlot +
+  coord_cartesian(xlim = c(0, 0.3), ylim = c(3, 3.65)) +
+  theme_void() +
+  labs(title = "") +
+  theme(legend.position = "none")
+
+bodyInset <- ggplotGrob(bodyInset)
+
+ggsave("Results/brmsOutputs/bodyInset.png", bodyInset,
+       width = 5, height = 5, dpi = 300, bg = "transparent")
+```
+
+Reload insets.
+
+```{r}
+tempInset <- readPNG("Results/brmsOutputs/tempInset.png")
+
+gillInset <- readPNG("Results/brmsOutputs/gillInset.png")
+
+bodyInset <- readPNG("Results/brmsOutputs/bodyInset.png")
 ```
 
 ```{r}
@@ -378,9 +432,7 @@ waterPosPlot <- ggplot(waterCoefs,
                                "Pelagic" = "#82e1da")) +
   scale_x_continuous(limits = c(-0.1, 5.5),
                      breaks = seq(0, 5, 1)) +
-  labs(title = "b",
-       # subtitle = "**Water Column Position**",
-       x = "Estimated Marginal Means") +
+  labs(x = "Estimated Marginal Means") +
   theme_classic() +
   theme(plot.subtitle = element_markdown(margin = margin(t = 10, b = -17), 
                                       hjust = 0.5, size = 7),
@@ -485,8 +537,9 @@ maxBodySize_plot <- ggplot(maxBody_epred_avg, aes(x = MaximumBodySize, y = .epre
   stat_lineribbon(.width = 0, color = "#20272f", alpha = 0.5) +
   scale_x_continuous(breaks = BodyScaled_breaks,
                      labels = round(BodyOriginal_breaks)) +
-  labs(title = "c",
-       x = "Maximum Body Size (cm)", y = "CFAR") +
+  scale_y_continuous(breaks = c(0, 1, 2, 3, 4, 5, 6),
+                     limits = c(0, 6)) +
+  labs(x = "Maximum Body Size (cm)", y = "CFAR") +
   theme_classic() +
   theme(legend.position = "none",
         plot.title.position = "plot",
@@ -495,7 +548,8 @@ maxBodySize_plot <- ggplot(maxBody_epred_avg, aes(x = MaximumBodySize, y = .epre
         axis.title.x = element_text(size = 7),
         axis.text.y = element_text(size = 6),
         axis.title.y = element_text(size = 7),
-        plot.margin = unit(c(0, 0.1, 0, 0), "cm"))
+        plot.margin = unit(c(0, 0.1, 0, 0), "cm")) +
+  draw_image(bodyInset, x = -1.6, y = 4.7, scale = 2.5)
 
 maxBodySize_plot
 
@@ -575,8 +629,9 @@ gillHeight_plot <- ggplot(gillSlit_epred_avg, aes(x = ProportionalGillAverage, y
     breaks = GillScaled_breaks,
     labels = round(GillOriginal_breaks, 2)
   ) +
-  labs(title = "d",
-       x = "Gill Slit Height (% TL)", y = "CFAR") +
+  scale_y_continuous(breaks = c(0, 1, 2, 3, 4, 5, 6),
+                     limits = c(0, 6)) +
+  labs(x = "Gill Slit Height (% TL)", y = "CFAR") +
   theme_classic() +
   theme(legend.position = "none",
         plot.title.position = "plot",
@@ -585,7 +640,8 @@ gillHeight_plot <- ggplot(gillSlit_epred_avg, aes(x = ProportionalGillAverage, y
         axis.title.x = element_text(size = 7),
         axis.text.y = element_text(size = 6),
         axis.title.y = element_text(size = 7),
-        plot.margin = unit(c(0, 0.1, 0, 0), "cm"))
+        plot.margin = unit(c(0, 0.1, 0, 0), "cm"))  +
+  draw_image(gillInset, x = -1.6, y = 4.7, scale = 2.5)
   
 gillHeight_plot
 
@@ -643,15 +699,17 @@ avgT_plot <- ggplot(avgT_epred_draws, aes(x = AvgTemperature, y = .epred)) +
     breaks = TempScaled_breaks,
     labels = round(TempOriginal_breaks, 1)
   ) +
-  labs(title = "e",
-       x = "Average Temperature (\u00B0C)", y = "CFAR") +
+  scale_y_continuous(breaks = c(0, 1, 2, 3, 4, 5, 6),
+                     limits = c(0, 6)) +
+  labs(x = "Average Temperature (\u00B0C)", y = "CFAR") +
   theme_classic() +
   theme(legend.position = "none",
         plot.title.position = "plot",
         plot.title = element_text(face = "bold", size = 8),
         axis.text = element_text(size = 6),
         axis.title = element_text(size = 7),
-        plot.margin = unit(c(0, 0.1, 0, 0), "cm"))
+        plot.margin = unit(c(0, 0.1, 0, 0), "cm"))  +
+  draw_image(tempInset, x = -1.7, y = 4.7, scale = 2.5)
   
 avgT_plot
 
@@ -664,7 +722,9 @@ waterCol_plot <- ggplot(data = sharkData, aes(x = WaterColumnPosition, y = CFAR,
                                "Pelagic" = "#82e1da")) +
   scale_color_manual(values = c("Benthic" = "#103f4d",
                                "Pelagic" = "#82e1da")) +
-  labs(title = "f", x = "", y = "CFAR") +
+  scale_y_continuous(breaks = c(0, 1, 2, 3, 4, 5, 6),
+                     limits = c(0, 6)) +
+  labs(x = "", y = "CFAR") +
   theme_classic() +
   theme(legend.position = "none",
         plot.title.position = "plot",
@@ -711,9 +771,20 @@ Figure4 <- plot_grid(
 ```
 
 ```{r}
+# Version 2
+Figure6 <- plot_grid(
+  maxBodySize_plot, gillHeight_plot,
+  avgT_plot, waterCol_plot,
+  ncol = 2, labels = c("a", "b", "c", "d"),
+  label_size = 8
+)
+```
+
+```{r}
 # Save combined plot
-ggsave("Results/Figures/Fig4.tiff", 
-       plot = Figure4, units = "px",
+ggsave("Results/Figures/Fig6.tiff", 
+       plot = Figure6, units = "px",
        device = "tiff", bg = "white",
-       width = 2160, height = 2750)
+       dpi = 300,
+       width = 2160, height = 1800)
 ```
