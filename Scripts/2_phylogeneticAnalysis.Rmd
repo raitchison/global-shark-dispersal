@@ -1,0 +1,352 @@
+---
+title: "2_phylogeneticAnalysis"
+output: html_document
+---
+
+## Purpose
+
+To visualize the phylogenetic pattern in CFAR and other traits.
+
+### Step 1: Load libraries
+
+Load the libraries used.
+
+```{r}
+# Load tidyverse for sanity
+library(tidyverse)
+
+# Load phytools, ape, and geiger for working with phylogenetic trees
+library(phytools)
+library(ape)
+library(geiger)
+
+# Load ggtree and ggtreeExtrafor plotting phylogenetic tree
+library(ggtree)
+library(ggtreeExtra)
+library(ggnewscale)
+
+# Load scico 
+library(scico)
+
+# Load cowplot
+library(cowplot)
+```
+
+### Step 2: Load files
+
+Load:
+* Nexus file (PhyloTrees.nex) 
+* Shark trait data (TraitData.csv)
+
+```{r}
+# Read the tree file
+Trees <- read.nexus("Data/SharkData/PhyloTrees.nex")
+
+# Use read.csv to load shark trait data
+sharkData <- read.csv("Data/SharkData/TraitData.csv")
+
+# Load Matley tracking data
+trackData <- read.csv("Supplementary_Material/Data/SharkData/Matley_TaggedSpecies.csv") %>%
+  # Mutate species names to match trait data
+  mutate(Genus_species = str_replace_all(species_fishbase, " ", "_")) %>%
+  select(Genus_species, n.tagged)
+```
+
+### Step 3: Sample a tree and make sure they match
+
+```{r}
+# Set seed for reproducability
+set.seed(123)
+
+# Sample a single tree from Trees
+sharkTree <- sample(Trees, 1)[[1]]
+
+# Set row names as species names
+rownames(sharkData) <- sharkData$Genus_species
+
+# Check species with setdiff (should return "character (0)")
+setdiff(sharkTree$tip.label, sharkData$Genus_species)
+```
+
+### Step 4: Append tracking data
+
+```{r}
+sharkJoined <- sharkData %>%
+  # Use left_join
+  left_join(trackData, by = "Genus_species") %>%
+  mutate(Tracked = if_else(is.na(n.tagged), "No","Yes"))
+```
+
+
+### Step 5: Get some higher level taxonomic information
+
+```{r}
+# Create a data frame of just the data we want
+sharkTraits <- sharkJoined %>%
+  select(Genus_species, Order, CFAR, MaximumBodySize, WaterColumnPosition, Tracked) %>%
+# See 1_Supplemental_CategoricalAnalysis for Benthopelagic > Benthic and Deepwater > Coastal
+  # Benthopelagic > Benthic
+  mutate(WaterColumnPosition = case_when(
+    str_detect(WaterColumnPosition, "Pelagic") ~ "Pelagic",
+    WaterColumnPosition == "Benthic" ~ "Benthic",
+    WaterColumnPosition == "Benthopelagic" ~ "Benthic"))
+```
+
+```{r}
+# Create a named list of species per Order
+order_groups <- split(sharkTraits$Genus_species, sharkTraits$Order)
+
+# Get MRCA nodes
+order_nodes <- sapply(order_groups, function(x) getMRCA(sharkTree, x))
+order_nodes
+
+# Create colors for each Order
+order_colors <- scico(n = length(order_nodes), palette = "lipari")
+names(order_colors) <- names(order_nodes)
+```
+
+### Step 6: Plot phylogenetic tree
+
+```{r}
+# Plot the tree before we go wild
+phyloTree <- ggtree(sharkTree)
+
+# Look at tree
+phyloTree
+```
+
+```{r}
+# Get plotted data
+tree_data <- phyloTree$data
+
+# Compute y positions for all Orders
+order_y <- sapply(names(order_nodes), function(o) {
+  node_number <- order_nodes[o]
+  tree_data$y[tree_data$node == node_number]
+})
+
+# Print node positions
+order_y
+```
+
+CFAR tree.
+
+```{r}
+# Add colors to Orders
+phyloTreeOrder <- ggtree(sharkTree, linewidth = 0.3)
+
+for (o in names(order_nodes)) {
+  phyloTreeOrder <- phyloTreeOrder +
+    geom_hilight(node = order_nodes[o], fill = order_colors[o], alpha = 0.2)
+}
+
+# Function to extract legends
+get_legend <- function(p) {
+  g <- ggplotGrob(p)
+  legend <- g$grobs[
+    sapply(g$grobs, function(x) x$name) == "guide-box"
+  ][[1]]
+  return(legend)
+}
+
+# Add CFAR bars
+phyloTreeCFAR <- phyloTreeOrder +
+  geom_fruit(
+    data = sharkTraits,
+    geom = geom_bar,
+    mapping = aes(y = Genus_species, x = CFAR, fill = CFAR),
+    orientation = "y",
+    stat = "identity",
+    pwidth = 0.1
+  ) +
+  scale_fill_scico(palette = "cork") +
+  theme(legend.direction = "horizontal",
+        legend.position = "inside",
+        legend.position.inside = c(0.1, 1),
+        legend.key.size = unit(0.3, "cm"),
+        legend.background = element_rect(fill = "transparent"),
+        legend.title.position = "top",
+        legend.title = element_text(hjust = 0.5, , size = 7),
+        legend.text = element_text(size = 6),
+        plot.margin = unit(c(1, 0, 0.1, 0), "cm"))
+
+# Extract legend
+CFARlegend <- get_legend(phyloTreeCFAR)
+
+phyloTreeCFAR
+```
+
+Maximum Body Size tree.
+
+```{r}
+phyloTreeSize <- phyloTreeOrder +
+  geom_fruit(
+    data = sharkTraits,
+    geom = geom_bar,
+    mapping = aes(y = Genus_species, x = log(MaximumBodySize), fill = log(MaximumBodySize)),
+    orientation = "y",
+    stat = "identity",
+    pwidth = 0.1,
+    inherit.aes = FALSE
+  ) +
+  scale_fill_scico(palette = "bam") +
+  labs(fill = "Body Size") +
+  theme(legend.direction = "horizontal",
+        legend.position = "inside",
+        legend.position.inside = c(0.1, 1),
+        legend.key.size = unit(0.3, "cm"),
+        legend.background = element_rect(fill = "transparent"),
+        legend.title.position = "top",
+        legend.title = element_text(hjust = 0.5, size = 7),
+        legend.text = element_text(size = 6),
+        plot.margin = unit(c(1, 0, 0.1, 0), "cm"))
+
+# Extract legend
+sizeLegend <- get_legend(phyloTreeSize)
+
+phyloTreeSize
+```
+
+Water Column Position Tree.
+
+```{r}
+phyloTreePosition <- phyloTreeOrder +
+  geom_fruit(
+    data = sharkTraits,
+    geom = geom_tile,
+    mapping = aes(y = Genus_species, x = 0, 
+                  fill = WaterColumnPosition),
+    stat = "identity",
+    width = 0.01,
+    pwidth = 0.1
+  ) +
+  scale_fill_manual(values = c("Pelagic" = "#82e1da", 
+                               "Benthic" = "#103f4d")) +
+  labs(fill = "Position") +
+  theme(legend.text = element_text(size = 6),
+        legend.title = element_text(hjust = 0.5, size = 7),
+        # legend.direction = "horizontal",
+        legend.position = "inside",
+        legend.title.position = "top",
+        legend.position.inside = c(0.1, 0.8),
+        legend.key.size = unit(0.3, "cm"),
+        legend.background = element_rect(fill = "transparent"))
+
+# Extract legend
+posLegend <- get_legend(phyloTreePosition)
+
+phyloTreePosition
+```
+
+Tracking data tree.
+
+```{r}
+phyloTreeTag <- phyloTreeOrder +
+  geom_fruit(
+    data = sharkTraits,
+    geom = geom_tile,
+    mapping = aes(y = Genus_species, x = 0, 
+                  fill = Tracked),
+    stat = "identity",
+    width = 0.01,
+    pwidth = 0.1
+  ) +
+  scale_fill_manual(values = c("Yes" = "black",
+                               "No" = "white")) +
+  labs(fill = "Tagged") +
+  theme(legend.text = element_text(size = 6),
+        legend.title = element_text(hjust = 0.5, size = 7),
+        # legend.direction = "horizontal",
+        legend.position = "inside",
+        legend.title.position = "top",
+        legend.position.inside = c(0.1, 0.8),
+        legend.key.size = unit(0.3, "cm"),
+        legend.background = element_rect(fill = "transparent"))
+
+# Extract legend
+tagLegend <- get_legend(phyloTreeTag)
+
+phyloTreeTag
+```
+
+Create the mega tree.
+
+```{r}
+# Build tree without legends
+phyloTreeFull <- phyloTreeOrder +
+  geom_fruit(
+    data = sharkTraits,
+    geom = geom_tile,
+    mapping = aes(y = Genus_species, x = 0,
+                  fill = Tracked),
+    stat = "identity",
+    width = 0.01,
+    pwidth = 0.07
+  ) +
+  scale_fill_manual(values = c("Yes" = "black",
+                               "No" = "white")) +
+  new_scale_fill() +
+    geom_fruit(
+    data = sharkTraits,
+    geom = geom_tile,
+    mapping = aes(y = Genus_species, x = 0,
+                  fill = WaterColumnPosition),
+    stat = "identity",
+    width = 0.01,
+    pwidth = 0.07,
+    offset = 0.1
+  ) +
+  scale_fill_manual(values = c("Pelagic" = "#82e1da",
+                               "Benthic" = "#103f4d")) +
+  new_scale_fill() +
+  geom_fruit(
+    data = sharkTraits,
+    geom = geom_bar,
+    mapping = aes(y = Genus_species, x = log(MaximumBodySize), fill = log(MaximumBodySize)),
+    orientation = "y",
+    stat = "identity",
+    pwidth = 0.15,
+    offset = 0.15
+  ) +
+  scale_fill_scico(palette = "bam") +
+  new_scale_fill() +
+  geom_fruit(
+    data = sharkTraits,
+    geom = geom_bar,
+    mapping = aes(y = Genus_species, x = CFAR, fill = CFAR),
+    orientation = "y",
+    stat = "identity",
+    pwidth = 0.15,
+    offset = 0.1
+  ) +
+  scale_fill_scico(palette = "cork") +
+  labs(fill = "") +
+  annotate("text", x = 0.54, y = 447, label = "Carcharhiniformes", size = 2.5) +
+  annotate("text", x = 0.51, y = 6, label = "Echinorhiniformes", size = 2.5) +
+  annotate("text", x = 0.76, y = 133, label = "Heterodontiformes", size = 2.5) +
+  annotate("text", x = 0.50, y = 2, label = "Hexanchiformes", size = 2.5) +
+  annotate("text", x = 0.78, y = 187, label = "Lamniformes", size = 2.5) +
+  annotate("text", x = 0.72, y = 175, label = "Orectolobiformes", size = 2.5) +
+  annotate("text", x = 0.51, y = 15, label = "Pristiophoriformes", size = 2.5) +
+  annotate("text", x = 0.82, y = 124, label = "Squaliformes", size = 2.5) +
+  theme(legend.position = "none",
+        margins = unit(c(1.1, 0.5, 0.1, 0),"cm"))
+
+phyloTreeFull
+
+# Add legends in custom position
+phyloTreeFinal <- ggdraw() +
+  draw_plot(phyloTreeFull) +
+  draw_plot(tagLegend, x = 0.51, y = 0.175) +
+  draw_plot(posLegend, x = 0.575, y = 0.175) +
+  draw_plot(sizeLegend, x = 0.668, y = -0.027) +
+  draw_plot(CFARlegend, x = 0.80, y = -0.027)
+
+phyloTreeFinal
+```
+
+```{r}
+ggsave("Results/Figures/FigX.png", phyloTreeFinal, units = "px",
+       width = 2000, height = 2350, dpi = 300)
+```
+
