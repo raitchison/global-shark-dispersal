@@ -633,7 +633,7 @@ right_column <- arrangeGrob(
   heights = c(0.14, 1)
 )
 
-Figure3 <- arrangeGrob(
+Figure4 <- arrangeGrob(
   spacer,
   left_column,
   spacer,
@@ -642,8 +642,8 @@ Figure3 <- arrangeGrob(
   widths = c(0.01, 0.9, 0.01, 0.9)
 )
 
-ggsave("Results/Figures/Fig3.tiff", 
-       plot = Figure3, units = "px",
+ggsave("Results/Figures/Fig4.tiff", 
+       plot = Figure4, units = "px",
        device = "tiff",
        bg = "white",
        width = 2250, height = 2000, dpi = 300)
