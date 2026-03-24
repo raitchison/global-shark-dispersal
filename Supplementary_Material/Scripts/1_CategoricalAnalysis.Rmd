@@ -59,7 +59,7 @@ positionPlot <- ggplot() +
 positionPlot
 
 # Save plot
-ggsave("Supplementary_Material/Results/FigS2_.tiff",
+ggsave("Supplementary_Material/Results/FigS1_.tiff",
        plot = positionPlot, units = "px",
        device = "tiff",
        width = 1200, height = 1300, dpi = 300)
@@ -167,7 +167,7 @@ habitatPlot <- ggplot() +
 habitatPlot
 
 # Save plot as a png
-ggsave("Supplementary_Material/Results/FigS3.tiff",
+ggsave("Supplementary_Material/Results/FigS2.tiff",
        plot = habitatPlot, units = "px",
        device = "tiff",
        width = 1200, height = 1300, dpi = 300)
@@ -264,7 +264,7 @@ habitatXwaterColumn <- ggplot(catCondensed,
 habitatXwaterColumn
 
 # Save plot
-ggsave("Supplementary_Material/Results/FigS4.tiff",
+ggsave("Supplementary_Material/Results/FigS3.tiff",
        plot = habitatXwaterColumn, units = "px",
        device = "tiff",
        width = 1500, height = 1500, dpi = 300)

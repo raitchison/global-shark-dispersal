@@ -47,7 +47,7 @@ sharkData <- read.csv("Data/SharkData/TraitData.csv") %>%
    PrimaryHabitat == "Coastal" ~ "Coastal"))
 
 # Load climate data to append oxygen
-oxygenData <- read.csv("Data/Data_Raw/SpeciesClimateData_251217.csv") %>%
+oxygenData <- read.csv("Supplementary_Material/Data/SharkData/SpeciesClimateData_251217.csv") %>%
   # Use filter to remove chimaeras and rays
   filter(order_name != 'MYLIOBATIFORMES', 
          order_name != 'RAJIFORMES',
@@ -131,7 +131,7 @@ plot_model_set(models, manual_layout = positions, edge_width = 0.75,
 
 ```{r}
 # Read in all 500 trees
-FullTree <- read.nexus('Data/Data_Processed/PrunedTrimmedTrees.nex')
+FullTree <- read.nexus('Data/SharkData/PhyloTrees.nex')
 
 # Set the seed
 set.seed(125)
@@ -211,7 +211,7 @@ dO2Plot <- ggplot(dissolvedOxygen,
 dO2Plot
 
 # Save model comparison plot as a png
-ggsave("Supplementary_Material/Results/FigS7B.png",
+ggsave("Supplementary_Material/Results/FigS5B.png",
        plot = dO2Plot, units = "px",
        width = 1000, height = 600, dpi = 300)
 
@@ -323,7 +323,7 @@ habitatPlot <- ggplot(habitatUse,
 habitatPlot
 
 # Save model comparison plot as a png
-ggsave("Supplementary_Material/Results/FigS8B.png",
+ggsave("Supplementary_Material/Results/FigS6B.png",
        plot = habitatPlot, units = "px",
        width = 1000, height = 600, dpi = 300)
 
@@ -367,7 +367,7 @@ bestModel <- plot(bestNoO2, manual_layout = best_positions,
 bestModel
 
 # Save best model plot as a png
-ggsave("Supplementary_Material/Results/FigS8C.png",
+ggsave("Supplementary_Material/Results/FigS6C.png",
        plot = bestModel, units = "px",
        width = 1250, height = 2625, dpi = 300)
 ```

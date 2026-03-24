@@ -1,5 +1,5 @@
 ---
-title: "X_threatStatus"
+title: "3_threatStatus"
 output: html_document
 ---
 
@@ -62,4 +62,3 @@ ggsave("Supplementary_Material/Results/FigSX.tiff",
        device = "tiff",
        width = 1200, height = 1300, dpi = 300)
 ```
-
