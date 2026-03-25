@@ -1,0 +1,269 @@
+---
+title: "1_taggingAnalysis"
+output: html_document
+---
+
+## Purpose
+
+To determine if there is a relationship between tagged status and:
+* Water column position
+* Taxonomy
+* IUCN category
+
+### Step 1: Load libraries
+
+Load the libraries used.
+
+```{r}
+# Load tidyverse for sanity
+library(tidyverse)
+
+# Load scico 
+library(scico)
+
+# Load cowplot
+library(cowplot)
+```
+
+### Step 2: Load files
+
+```{r}
+# Load shark trait data
+sharkData <- read.csv("Data/SharkData/TraitData.csv")
+
+# Load Matley tracking data
+trackData <- read.csv("Supplementary_Material/Data/SharkData/Matley_TaggedSpecies.csv") %>%
+  # Mutate species names to match trait data
+  mutate(Genus_species = str_replace_all(species_fishbase, " ", "_")) %>%
+  select(Genus_species, n.tagged, n.articles)
+```
+
+### Step 3: Append tracking data
+
+```{r}
+sharkJoined <- sharkData %>%
+  # Use left_join
+  left_join(trackData, by = "Genus_species") %>%
+  mutate(Tracked = if_else(is.na(n.tagged), "No","Yes"))
+```
+
+### Step 4: Create contingency tables
+
+```{r}
+# Water Column Position
+posTable <- sharkJoined %>%
+  count(WaterColumnPosition, Tracked) %>%
+  pivot_wider(names_from = Tracked, values_from = n, values_fill = 0)
+
+posMatrix <- posTable %>%
+  column_to_rownames("WaterColumnPosition") %>%
+  as.matrix()
+
+# Family
+famTable <- sharkJoined %>%
+  count(Family, Tracked) %>%
+  pivot_wider(names_from = Tracked, values_from = n, values_fill = 0)
+
+famMatrix <- famTable %>%
+  column_to_rownames("Family") %>%
+  as.matrix()
+
+# IUCN Category
+IUCNtable <- sharkJoined %>%
+  count(IUCNcategory, Tracked) %>%
+  pivot_wider(names_from = Tracked, values_from = n, values_fill = 0)
+
+IUCNmatrix <- IUCNtable %>%
+  column_to_rownames("IUCNcategory") %>%
+  as.matrix()
+```
+
+### Step 5: Run chi-squared tests
+
+```{r}
+# Water Column Position
+posTest <- chisq.test(posMatrix)
+posTest$expected
+posTest
+
+# Family
+famTest <- chisq.test(famMatrix)
+famTest$expected
+famTest
+# Simulate p-values because of low family coverage
+famTest2 <- chisq.test(famMatrix, simulate.p.value = TRUE, B = 5000)
+famTest2$expected
+famTest2
+
+# IUCN Category
+iucnTest <- chisq.test(IUCNmatrix)
+iucnTest$expected
+iucnTest
+```
+
+```{r}
+# Create table of chi-squared results
+results <- tibble(
+  "Axis" = c("Water Column Position", "Family", "IUCN Category"),
+  "Chi sq" = c(posTest$statistic, famTest2$statistic, iucnTest$statistic),
+  "Degrees of Freedom" = c(posTest$parameter, famTest2$parameter, iucnTest$parameter),
+  "p-value" = c(posTest$p.value, famTest2$p.value, iucnTest$p.value)
+)
+
+# Save chi-squared results as a csv
+write.csv(results, "Supplementary_Material/Results/TableS1_Chi-squared.csv",
+          row.names = FALSE)
+```
+
+### Step 6: Make plots
+
+```{r}
+# Water Column Position
+# Summarize observed counts
+obs_WaterColumnPosition <- sharkJoined %>%
+  count(WaterColumnPosition, Tracked) %>%
+  mutate(Type = "Observed")
+
+# Compute expected counts based on total species per WaterColumnPosition
+total_tracked <- sum(sharkJoined$Tracked == "Yes")
+total_species <- nrow(sharkJoined)
+
+exp_WaterColumnPosition <- sharkJoined %>%
+  group_by(WaterColumnPosition) %>%
+  summarise(total_species = n()) %>%
+  mutate(
+    Yes = total_tracked * total_species / sum(total_species),
+    No = total_species - Yes
+  ) %>%
+  pivot_longer(cols = c(No, Yes), names_to = "Tracked", values_to = "n") %>%
+  mutate(Type = "Expected")
+
+# Combine observed and expected
+plot_WaterColumnPosition <- bind_rows(obs_WaterColumnPosition, exp_WaterColumnPosition)
+
+# Stacked bar chart
+posPlot <- ggplot(plot_WaterColumnPosition, aes(x = WaterColumnPosition, y = n, 
+                                                 fill = Tracked)) +
+  geom_bar(stat = "identity") +
+  scale_fill_manual(values = c("Yes" = "darkslategrey", 
+                               "No" = "grey90")) +
+  facet_wrap(~Type) +
+  labs(y = "Total species", fill = "Tracked") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 6),
+        axis.text.y = element_text(size = 6),
+        axis.title.y = element_text(size = 7),
+        axis.title.x = element_blank(),
+        legend.position = "none")
+
+posPlot
+```
+
+```{r}
+# Family
+# Summarize observed counts
+obs_Family <- sharkJoined %>%
+  count(Family, Tracked) %>%
+  mutate(Type = "Observed")
+
+# Compute expected counts based on total species per Family
+total_tracked <- sum(sharkJoined$Tracked == "Yes")
+total_species <- nrow(sharkJoined)
+
+exp_Family <- sharkJoined %>%
+  group_by(Family) %>%
+  summarise(total_species = n()) %>%
+  mutate(
+    Yes = total_tracked * total_species / sum(total_species),
+    No = total_species - Yes
+  ) %>%
+  pivot_longer(cols = c(No, Yes), names_to = "Tracked", values_to = "n") %>%
+  mutate(Type = "Expected")
+
+# Combine observed and expected
+plot_Family <- bind_rows(obs_Family, exp_Family)
+
+# Stacked bar chart
+famPlot <- ggplot(plot_Family, aes(x = Family, y = n, fill = Tracked)) +
+  geom_bar(stat = "identity") +
+  scale_fill_manual(values = c("Yes" = "darkslategrey", 
+                               "No" = "grey90")) +
+  facet_wrap(~Type) +
+  labs(y = "Total species") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 6),
+        axis.text.y = element_text(size = 6),
+        axis.title.y = element_text(size = 7),
+        axis.title.x = element_blank(),
+        legend.position = "none")
+
+famPlot
+```
+
+```{r}
+# IUCN Category
+# Set order of categories
+sharkJoined <- sharkJoined %>%
+  mutate(IUCNcategory = factor(IUCNcategory, 
+                               levels = c("DD", "LC", "NT", "VU", "EN", "CR")))
+
+# Summarize observed counts
+obs_IUCNcategory <- sharkJoined %>%
+  count(IUCNcategory, Tracked) %>%
+  mutate(Type = "Observed")
+
+# Compute expected counts based on total species per IUCNcategory
+total_tracked <- sum(sharkJoined$Tracked == "Yes")
+total_species <- nrow(sharkJoined)
+
+exp_IUCNcategory <- sharkJoined %>%
+  group_by(IUCNcategory) %>%
+  summarise(total_species = n()) %>%
+  mutate(
+    Yes = total_tracked * total_species / sum(total_species),
+    No = total_species - Yes
+  ) %>%
+  pivot_longer(cols = c(No, Yes), names_to = "Tracked", values_to = "n") %>%
+  mutate(Type = "Expected")
+
+# Combine observed and expected
+plot_IUCNcategory <- bind_rows(obs_IUCNcategory, exp_IUCNcategory)
+
+# Stacked bar chart
+catPlot <- ggplot(plot_IUCNcategory, aes(x = IUCNcategory, y = n, fill = Tracked)) +
+  geom_bar(stat = "identity") +
+  scale_fill_manual(values = c("Yes" = "darkslategrey", 
+                               "No" = "grey90"),
+                    labels = c("Not Tagged", "Tagged")) +
+  facet_wrap(~Type) +
+  labs(fill = "Status") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 6),
+        axis.text.y = element_text(size = 6),
+        axis.title = element_blank(),
+        legend.text = element_text(size = 6),
+        legend.title = element_text(size = 7, hjust = 0.5))
+
+catPlot
+```
+
+Combine plots and save.
+
+```{r}
+# Arrange top row
+top <- plot_grid(
+  posPlot, catPlot, align = "h",
+  labels = c("a", "b"), label_size = 8
+)
+
+FigureS1 <- plot_grid(
+  top, famPlot,
+  ncol = 1,
+  labels = c("", "c"), label_size = 8
+)
+
+ggsave("Supplementary_Material/Results/FigS1.tiff",
+       plot = FigureS1, units = "px",
+       device = "tiff",
+       width = 2100, height = 1500, dpi = 300)
+```
