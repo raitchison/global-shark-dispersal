@@ -41,7 +41,7 @@ The first approach is to compare CFAR values for the three water column position
 We'll first visualize the spread of CFAR by water column position.
 
 ```{r}
-positionPlot <- ggplot() +
+FigureS2 <- ggplot() +
   geom_jitter(data = categoricalData, 
               aes(x = WaterColumnPosition, y = CFAR,
                   color = WaterColumnPosition), size = 2) +
@@ -56,11 +56,11 @@ positionPlot <- ggplot() +
         axis.title.y = element_text(size = 12),
         legend.position = "none")
 
-positionPlot
+FigureS2
 
 # Save plot
-ggsave("Supplementary_Material/Results/FigS1_.tiff",
-       plot = positionPlot, units = "px",
+ggsave("Supplementary_Material/Results/FigS2.tiff",
+       plot = FigureS2, units = "px",
        device = "tiff",
        width = 1200, height = 1300, dpi = 300)
 ```
@@ -125,7 +125,7 @@ compareWaterColumnAIC <- data.frame(AIC(OGwaterCategories, ToPelagic, ToBenthic)
 compareWaterColumnAIC
 
 # Save AIC data frame as a csv
-write.csv(compareWaterColumnAIC, "Supplementary_Material/Results/TableS1_WaterPosition.csv",
+write.csv(compareWaterColumnAIC, "Supplementary_Material/Results/TableS2_WaterPosition.csv",
           row.names = TRUE)
 ```
 
@@ -149,7 +149,7 @@ categoricalData <- categoricalData %>%
 
 habitat_order <- c("Deepwater", "Coastal", "Oceanic")
 
-habitatPlot <- ggplot() +
+FigureS3 <- ggplot() +
   geom_jitter(data = categoricalData, 
              aes(x = factor(PrimaryHabitat, levels = habitat_order), y = CFAR,
                  color = PrimaryHabitat), size = 2) +
@@ -164,11 +164,11 @@ habitatPlot <- ggplot() +
         axis.title.y = element_text(size = 12),
         legend.position = "none")
 
-habitatPlot
+FigureS3
 
 # Save plot as a png
-ggsave("Supplementary_Material/Results/FigS2.tiff",
-       plot = habitatPlot, units = "px",
+ggsave("Supplementary_Material/Results/FigS3.tiff",
+       plot = FigureS3, units = "px",
        device = "tiff",
        width = 1200, height = 1300, dpi = 300)
 ```
@@ -222,7 +222,7 @@ compareHabitatAIC <- data.frame(AIC(OGhabitatCategories, ToCoastal, ToOceanic))
 compareHabitatAIC
 
 # Save AIC data frame as a csv
-write.csv(compareHabitatAIC, "Supplementary_Material/Results/TableS2_HabitatUse.csv",
+write.csv(compareHabitatAIC, "Supplementary_Material/Results/TableS3_HabitatUse.csv",
           row.names = TRUE)
 ```
 
@@ -249,7 +249,7 @@ catCondensed <- categoricalData %>%
    PrimaryHabitat == "Deepwater" ~ "Coastal",
    PrimaryHabitat == "Coastal" ~ "Coastal"))
 
-habitatXwaterColumn <- ggplot(catCondensed, 
+FigureS4 <- ggplot(catCondensed, 
                               aes(x = PrimaryHabitat, y = WaterColumnPosition, 
                                   color = CFAR)) +
   geom_jitter(size = 3, alpha = 0.8, width = 0.3, height = 0.3) +
@@ -261,11 +261,11 @@ habitatXwaterColumn <- ggplot(catCondensed,
   theme(legend.position = "inside",
         legend.position.inside = c(0.92, 0.2))
 
-habitatXwaterColumn
+FigureS4
 
 # Save plot
-ggsave("Supplementary_Material/Results/FigS3.tiff",
-       plot = habitatXwaterColumn, units = "px",
+ggsave("Supplementary_Material/Results/FigS4.tiff",
+       plot = FigureS3, units = "px",
        device = "tiff",
        width = 1500, height = 1500, dpi = 300)
 ```
