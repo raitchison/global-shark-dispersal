@@ -25,11 +25,13 @@ library(ggtree)
 library(ggtreeExtra)
 library(ggnewscale)
 
-# Load scico 
+# Load scico for color palettes
 library(scico)
 
-# Load cowplot
+# Load plotting libraries
 library(cowplot)
+library(grid)
+library(gridExtra)
 ```
 
 ### Step 2: Load files
@@ -77,13 +79,13 @@ sharkJoined <- sharkData %>%
   mutate(Tracked = if_else(is.na(n.tagged), "No","Yes"))
 ```
 
-
 ### Step 5: Get some higher level taxonomic information
 
 ```{r}
 # Create a data frame of just the data we want
 sharkTraits <- sharkJoined %>%
-  select(Genus_species, Order, CFAR, MaximumBodySize, WaterColumnPosition, Tracked) %>%
+  select(Genus_species, Order, CFAR, MaximumBodySize, 
+        ProportionalGillAverage, WaterColumnPosition, Tracked) %>%
 # See 1_Supplemental_CategoricalAnalysis for Benthopelagic > Benthic and Deepwater > Coastal
   # Benthopelagic > Benthic
   mutate(WaterColumnPosition = case_when(
@@ -105,10 +107,45 @@ order_colors <- scico(n = length(order_nodes), palette = "lipari")
 names(order_colors) <- names(order_nodes)
 ```
 
-### Step 6: Plot phylogenetic tree
+### Step 6: Ancestral state reconstruction (ASR) of CFAR
 
 ```{r}
-# Plot the tree before we go wild
+# Create CFAR vector
+CFAR <- sharkTraits %>%
+  select(Genus_species, CFAR) %>%
+  filter(Genus_species %in% sharkTree$tip.label) %>%
+  slice(match(sharkTree$tip.label, Genus_species)) %>%
+  deframe()
+
+# Run fastAnc to estimate ancestral states, compute variances and 95% confidence intervals
+anc_CFAR <- fastAnc(sharkTree, CFAR, vars = TRUE, CI = TRUE)
+
+# Make dataframe with estimated trait values at tips
+td <- data.frame(node = nodeid(sharkTree, names(CFAR)),
+                 trait = CFAR)
+
+# Make dataframe with estimated trait values at nodes
+nd <- data.frame(node = names(anc_CFAR$ace), trait = anc_CFAR$ace)
+
+# Combine with tree data to plot with ggtree
+d <- rbind(td, nd)
+d$node <- as.numeric(d$node)
+# Join the data with the tree
+ancTree <- full_join(sharkTree, d, by = 'node')
+
+# Plot tree (with ASR)
+phyTree <- ggtree(ancTree, aes(color = trait),
+                  continuous = "color", linewidth = 1) +
+  scale_color_scico(palette = "corkO") +
+  theme(legend.position = "none")
+
+phyTree
+```
+
+### Step 7: Create mega phylogenetic tree plot
+
+```{r}
+# Plot simple tree before we go wild (without ASR)
 phyloTree <- ggtree(sharkTree)
 
 # Look at tree
@@ -132,13 +169,21 @@ order_y
 CFAR tree.
 
 ```{r}
-# Add colors to Orders
-phyloTreeOrder <- ggtree(sharkTree, linewidth = 0.3)
+# Create tree with no lines so downstream hilights are behind branches
+phyloTreeOrder <- ggtree(ancTree, linewidth = 0,
+                         alpha = 0)
 
 for (o in names(order_nodes)) {
   phyloTreeOrder <- phyloTreeOrder +
-    geom_hilight(node = order_nodes[o], fill = order_colors[o], alpha = 0.2)
+    geom_hilight(node = order_nodes[o],
+                 fill = order_colors[o],
+                 alpha = 0.25)
 }
+
+phyloTreeOrder <- phyloTreeOrder +
+  geom_tree(aes(color = trait), linewidth = 1) +
+  scale_color_scico(palette = "corkO") +
+  theme(legend.position = "none")
 
 # Function to extract legends
 get_legend <- function(p) {
@@ -150,7 +195,8 @@ get_legend <- function(p) {
 }
 
 # Add CFAR bars
-phyloTreeCFAR <- phyloTreeOrder +
+phyloTreeCFAR <- phyloTree +
+  new_scale_fill() +
   geom_fruit(
     data = sharkTraits,
     geom = geom_bar,
@@ -173,17 +219,19 @@ phyloTreeCFAR <- phyloTreeOrder +
 # Extract legend
 CFARlegend <- get_legend(phyloTreeCFAR)
 
+# See tree
 phyloTreeCFAR
 ```
 
 Maximum Body Size tree.
 
 ```{r}
-phyloTreeSize <- phyloTreeOrder +
+phyloTreeSize <- phyloTree +
   geom_fruit(
     data = sharkTraits,
     geom = geom_bar,
-    mapping = aes(y = Genus_species, x = log(MaximumBodySize), fill = log(MaximumBodySize)),
+    mapping = aes(y = Genus_species, x = log(MaximumBodySize), 
+                  fill = log(MaximumBodySize)),
     orientation = "y",
     stat = "identity",
     pwidth = 0.1,
@@ -204,13 +252,47 @@ phyloTreeSize <- phyloTreeOrder +
 # Extract legend
 sizeLegend <- get_legend(phyloTreeSize)
 
+# See tree
 phyloTreeSize
+```
+
+Gill Slit tree.
+
+```{r}
+phyloTreeGills <- phyloTree +
+  geom_fruit(
+    data = sharkTraits,
+    geom = geom_bar,
+    mapping = aes(y = Genus_species, x = ProportionalGillAverage, fill = ProportionalGillAverage),
+    orientation = "y",
+    stat = "identity",
+    pwidth = 0.1,
+    inherit.aes = FALSE
+  ) +
+  scale_fill_scico(palette = "grayC",
+                   breaks = c(0.02, 0.05, 0.08)) +
+  labs(fill = "Gill Slit Height") +
+  theme(legend.direction = "horizontal",
+        legend.position = "inside",
+        legend.position.inside = c(0.1, 1),
+        legend.key.size = unit(0.3, "cm"),
+        legend.background = element_rect(fill = "transparent"),
+        legend.title.position = "top",
+        legend.title = element_text(hjust = 0.5, size = 7),
+        legend.text = element_text(size = 6),
+        plot.margin = unit(c(1, 0, 0.1, 0), "cm"))
+
+# Extract legend
+gillLegend <- get_legend(phyloTreeGills)
+
+# See tree
+phyloTreeGills
 ```
 
 Water Column Position Tree.
 
 ```{r}
-phyloTreePosition <- phyloTreeOrder +
+phyloTreePosition <- phyloTree +
   geom_fruit(
     data = sharkTraits,
     geom = geom_tile,
@@ -235,13 +317,14 @@ phyloTreePosition <- phyloTreeOrder +
 # Extract legend
 posLegend <- get_legend(phyloTreePosition)
 
+# See tree
 phyloTreePosition
 ```
 
 Tracking data tree.
 
 ```{r}
-phyloTreeTag <- phyloTreeOrder +
+phyloTreeTag <- phyloTree +
   geom_fruit(
     data = sharkTraits,
     geom = geom_tile,
@@ -266,6 +349,7 @@ phyloTreeTag <- phyloTreeOrder +
 # Extract legend
 tagLegend <- get_legend(phyloTreeTag)
 
+# See tree
 phyloTreeTag
 ```
 
@@ -274,19 +358,43 @@ Create the mega tree.
 ```{r}
 # Build tree without legends
 phyloTreeFull <- phyloTreeOrder +
+  # CFAR
   geom_fruit(
     data = sharkTraits,
-    geom = geom_tile,
-    mapping = aes(y = Genus_species, x = 0,
-                  fill = Tracked),
+    geom = geom_bar,
+    mapping = aes(y = Genus_species, x = CFAR, fill = CFAR),
+    orientation = "y",
     stat = "identity",
-    width = 0.01,
-    pwidth = 0.07
-  ) +
-  scale_fill_manual(values = c("Yes" = "black",
-                               "No" = "white")) +
+    pwidth = 0.15,
+    offset = 0.01) +
+  scale_fill_scico(palette = "cork") +
   new_scale_fill() +
-    geom_fruit(
+  # Maximum body size
+  geom_fruit(
+    data = sharkTraits,
+    geom = geom_bar,
+    mapping = aes(y = Genus_species, x = log(MaximumBodySize), 
+                  fill = log(MaximumBodySize)),
+    orientation = "y",
+    stat = "identity",
+    pwidth = 0.15,
+  ) +
+  scale_fill_scico(palette = "bam") +
+  new_scale_fill() +
+  # Gill slit height
+  geom_fruit(
+    data = sharkTraits,
+    geom = geom_bar,
+    mapping = aes(y = Genus_species, x = ProportionalGillAverage, 
+                  fill = ProportionalGillAverage),
+    orientation = "y",
+    stat = "identity",
+    pwidth = 0.1
+  ) +
+  scale_fill_scico(palette = "grayC") +
+  new_scale_fill() +
+  # Water column position
+  geom_fruit(
     data = sharkTraits,
     geom = geom_tile,
     mapping = aes(y = Genus_species, x = 0,
@@ -299,36 +407,28 @@ phyloTreeFull <- phyloTreeOrder +
   scale_fill_manual(values = c("Pelagic" = "#82e1da",
                                "Benthic" = "#103f4d")) +
   new_scale_fill() +
-  geom_fruit(
+  # Tracking status
+    geom_fruit(
     data = sharkTraits,
-    geom = geom_bar,
-    mapping = aes(y = Genus_species, x = log(MaximumBodySize), fill = log(MaximumBodySize)),
-    orientation = "y",
+    geom = geom_tile,
+    mapping = aes(y = Genus_species, x = 0,
+                  fill = Tracked),
     stat = "identity",
-    pwidth = 0.15,
+    width = 0.01,
+    pwidth = 0.07,
     offset = 0.15
   ) +
-  scale_fill_scico(palette = "bam") +
-  new_scale_fill() +
-  geom_fruit(
-    data = sharkTraits,
-    geom = geom_bar,
-    mapping = aes(y = Genus_species, x = CFAR, fill = CFAR),
-    orientation = "y",
-    stat = "identity",
-    pwidth = 0.15,
-    offset = 0.1
-  ) +
-  scale_fill_scico(palette = "cork") +
+  scale_fill_manual(values = c("Yes" = "black",
+                               "No" = "white")) +
   labs(fill = "") +
   annotate("text", x = 0.54, y = 447, label = "Carcharhiniformes", size = 2.5) +
   annotate("text", x = 0.51, y = 6, label = "Echinorhiniformes", size = 2.5) +
   annotate("text", x = 0.76, y = 133, label = "Heterodontiformes", size = 2.5) +
   annotate("text", x = 0.50, y = 2, label = "Hexanchiformes", size = 2.5) +
   annotate("text", x = 0.78, y = 187, label = "Lamniformes", size = 2.5) +
-  annotate("text", x = 0.72, y = 175, label = "Orectolobiformes", size = 2.5) +
+  annotate("text", x = 0.73, y = 175, label = "Orectolobiformes", size = 2.5) +
   annotate("text", x = 0.51, y = 15, label = "Pristiophoriformes", size = 2.5) +
-  annotate("text", x = 0.82, y = 124, label = "Squaliformes", size = 2.5) +
+  annotate("text", x = 0.83, y = 123, label = "Squaliformes", size = 2.5) +
   theme(legend.position = "none",
         margins = unit(c(1.1, 0.5, 0.1, 0),"cm"))
 
@@ -337,17 +437,31 @@ phyloTreeFull
 # Add legends in custom position
 phyloTreeFinal <- ggdraw() +
   draw_plot(phyloTreeFull) +
-  draw_plot(tagLegend, x = 0.51, y = 0.175) +
-  draw_plot(posLegend, x = 0.575, y = 0.175) +
-  draw_plot(sizeLegend, x = 0.668, y = -0.027) +
-  draw_plot(CFARlegend, x = 0.80, y = -0.027)
+  draw_plot(tagLegend, x = 0.840, y = 0.175) +
+  draw_plot(posLegend, x = 0.775, y = 0.175) +
+  draw_plot(gillLegend, x = 0.688, y = -0.027) +
+  draw_plot(sizeLegend, x = 0.595, y = -0.027) +
+  draw_plot(CFARlegend, x = 0.505, y = -0.027)
 
 phyloTreeFinal
 ```
 
+### Step 8: Create and save Figure 2
+
 ```{r}
-ggsave("Results/Figures/Fig2.tiff", phyloTreeFinal, units = "px",
-       device = "tiff",
+# Create a nullGrob to act as a spacer
+spacer <- nullGrob()
+
+# Combine plots
+Figure2 <- arrangeGrob(
+  spacer,
+  phyloTreeFinal,
+  ncol = 1,
+  heights = c(0.01, 1)
+)
+
+# Save final figure
+ggsave("Results/Figures/Fig2.tiff", Figure2, units = "px",
+       device = "tiff", bg = "white",
        width = 2000, height = 2350, dpi = 300)
 ```
-
