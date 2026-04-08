@@ -1,8 +1,8 @@
-# Global patterns and drivers of dispersal potential in sharks
+# Tail shape expands dispersal inference across sharks to reveal global patterns and ecological drivers
 
 ## Overview
 
-Code for "Global patterns and drivers of dispersal potential in sharks" by Aitchison et al.
+Code for "Tail shape expands dispersal inference across sharks to reveal global patterns and ecological drivers" by Aitchison et al.
 
 ## Contents and Structure
 
