@@ -157,7 +157,7 @@ swimSpeed <- brm(speed ~ CFAR + (1|gr(Genus_species, cov = A)),
               family = gaussian(),
               prior = priors_swim,
               # Increase adapt_delta due to small sample size
-              control = list(adapt_delta = 0.95),
+              control = list(adapt_delta = 0.97),
               warmup = 1000, iter = 3000,
               cores = 2,
               save_pars = save_pars(all = TRUE))
@@ -358,7 +358,7 @@ panelA
 
 ```{r}
 # Align plots by y-axis
-aligned <- align_plots(speedPlot, rangePlot, align = "v", axis = "l")
+aligned <- cowplot::align_plots(speedPlot, rangePlot, align = "hv")
 
 # Create spacer
 space <- nullGrob()
