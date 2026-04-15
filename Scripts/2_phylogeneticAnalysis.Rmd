@@ -120,6 +120,17 @@ CFAR <- sharkTraits %>%
 # Run fastAnc to estimate ancestral states, compute variances and 95% confidence intervals
 anc_CFAR <- fastAnc(sharkTree, CFAR, vars = TRUE, CI = TRUE)
 
+# View the states at each node
+anc_CFAR$ace
+
+# Get the node closest to the "root"
+root <- Ntip(sharkTree) + 1
+
+# Get the "root" estimate, variance, and CI
+rootEst <- anc_CFAR$ace[as.character(root)]
+rootVar <- anc_CFAR$var[as.character(root)]
+rootCI <- anc_CFAR$CI95[as.character(root), ]
+
 # Make dataframe with estimated trait values at tips
 td <- data.frame(node = nodeid(sharkTree, names(CFAR)),
                  trait = CFAR)
