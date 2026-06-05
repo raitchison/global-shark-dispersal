@@ -1,5 +1,5 @@
 ---
-title: "1_DispersalCFAR"
+title: "1_dispersalCFAR"
 output: html_document
 ---
 
