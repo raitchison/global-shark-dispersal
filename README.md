@@ -1,8 +1,8 @@
-# Tail shape expands dispersal inference across sharks to reveal global patterns and ecological drivers
+# From wings to tails: the aspect ratio of propulsive surfaces as a general proxy for vertebrate dispersal potential
 
 ## Overview
 
-Code for "Tail shape expands dispersal inference across sharks to reveal global patterns and ecological drivers" by Aitchison et al.
+Data and code for "From wings to tails: the aspect ratio of propulsive surfaces as a general proxy for vertebrate dispersal potential"
 
 ## Contents and Structure
 
@@ -14,7 +14,7 @@ Code for "Tail shape expands dispersal inference across sharks to reveal global 
   - brmsOutputs
   - Figures
   - Tables
-* Supplementary_Material
+* Supplementary_Material: contains data files, analysis scripts, and results for supplementary analyses
   - Data
   - Results
   - Scripts
