@@ -1,4 +1,4 @@
-# From wings to tails: the aspect ratio of propulsive surfaces as a general proxy for vertebrate dispersal potential
+# From wings to tails: a general framework for estimating dispersal from morphology
 
 ## Overview
 
