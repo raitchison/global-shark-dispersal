@@ -28,6 +28,9 @@ library(ggnewscale)
 # Load scico for color palettes
 library(scico)
 
+# Load phylopic for silhouettes
+library(rphylopic)
+
 # Load plotting libraries
 library(cowplot)
 library(grid)
@@ -101,101 +104,50 @@ order_groups <- split(sharkTraits$Genus_species, sharkTraits$Order)
 # Get MRCA nodes
 order_nodes <- sapply(order_groups, function(x) getMRCA(sharkTree, x))
 order_nodes
-
-# Create colors for each Order
-order_colors <- scico(n = length(order_nodes), palette = "lipari")
-names(order_colors) <- names(order_nodes)
 ```
 
-### Step 6: Ancestral state reconstruction (ASR) of CFAR
+### Step 6: Create mega phylogenetic tree plot
 
 ```{r}
-# Create CFAR vector
-CFAR <- sharkTraits %>%
-  select(Genus_species, CFAR) %>%
-  filter(Genus_species %in% sharkTree$tip.label) %>%
-  slice(match(sharkTree$tip.label, Genus_species)) %>%
-  deframe()
-
-# Run fastAnc to estimate ancestral states, compute variances and 95% confidence intervals
-anc_CFAR <- fastAnc(sharkTree, CFAR, vars = TRUE, CI = TRUE)
-
-# View the states at each node
-anc_CFAR$ace
-
-# Get the node closest to the "root"
-root <- Ntip(sharkTree) + 1
-
-# Get the "root" estimate, variance, and CI
-rootEst <- anc_CFAR$ace[as.character(root)]
-rootVar <- anc_CFAR$var[as.character(root)]
-rootCI <- anc_CFAR$CI95[as.character(root), ]
-
-# Make dataframe with estimated trait values at tips
-td <- data.frame(node = nodeid(sharkTree, names(CFAR)),
-                 trait = CFAR)
-
-# Make dataframe with estimated trait values at nodes
-nd <- data.frame(node = names(anc_CFAR$ace), trait = anc_CFAR$ace)
-
-# Combine with tree data to plot with ggtree
-d <- rbind(td, nd)
-d$node <- as.numeric(d$node)
-# Join the data with the tree
-ancTree <- full_join(sharkTree, d, by = 'node')
-
-# Plot tree (with ASR)
-phyTree <- ggtree(ancTree, aes(color = trait),
-                  continuous = "color", linewidth = 1) +
-  scale_color_scico(palette = "corkO") +
-  theme(legend.position = "none")
-
-phyTree
-```
-
-### Step 7: Create mega phylogenetic tree plot
-
-```{r}
-# Plot simple tree before we go wild (without ASR)
-phyloTree <- ggtree(sharkTree)
+# Plot simple tree before we go wild
+phyloTree <- ggtree(sharkTree, linewidth = 0.3)
 
 # Look at tree
 phyloTree
 ```
 
 ```{r}
-# Get plotted data
-tree_data <- phyloTree$data
+# Get vector of node IDs
+nodes_vector <- as.numeric(order_nodes)
 
-# Compute y positions for all Orders
-order_y <- sapply(names(order_nodes), function(o) {
-  node_number <- order_nodes[o]
-  tree_data$y[tree_data$node == node_number]
-})
+# Assign names to vector elements
+names(nodes_vector) <- names(order_nodes)
 
-# Print node positions
-order_y
+# Group ancestral clades
+grouped_sharkTree <- groupClade(sharkTree, .node = nodes_vector)
+
+# Plot tree with colored Orders
+phyloTree <- ggtree(grouped_sharkTree, aes(color = group), 
+                    linewidth = 0.3) +
+  scale_color_manual(values = c(
+    "Carcharhiniformes"  = "#ba4848",
+    "Lamniformes"        = "#f7c435",
+    "Orectolobiformes"   = "#f0b6ad",
+    "Heterodontiformes"  = "#0b5227",
+    "Squaliformes"       = "#85a993",
+    "Pristiophoriformes" = "#dc8864",
+    "Echinorhiniformes"  = "#818b2e",
+    "Hexanchiformes"     = "#c75a1b",
+    "0"                  = "black")) +
+  guides(color = "none") +
+  xlim(0, 3)
+
+phyloTree
 ```
 
-CFAR tree.
+Create function for extracing legends.
 
 ```{r}
-# Create tree with no lines so downstream hilights are behind branches
-phyloTreeOrder <- ggtree(ancTree, linewidth = 0,
-                         alpha = 0)
-
-for (o in names(order_nodes)) {
-  phyloTreeOrder <- phyloTreeOrder +
-    geom_hilight(node = order_nodes[o],
-                 fill = order_colors[o],
-                 alpha = 0.25)
-}
-
-phyloTreeOrder <- phyloTreeOrder +
-  geom_tree(aes(color = trait), linewidth = 1) +
-  scale_color_scico(palette = "corkO") +
-  theme(legend.position = "none")
-
 # Function to extract legends
 get_legend <- function(p) {
   g <- ggplotGrob(p)
@@ -204,9 +156,14 @@ get_legend <- function(p) {
   ][[1]]
   return(legend)
 }
+```
 
+CFAR tree.
+
+```{r}
 # Add CFAR bars
 phyloTreeCFAR <- phyloTree +
+  theme(legend.position = "none") +
   new_scale_fill() +
   geom_fruit(
     data = sharkTraits,
@@ -368,7 +325,7 @@ Create the mega tree.
 
 ```{r}
 # Build tree without legends
-phyloTreeFull <- phyloTreeOrder +
+phyloTreeFull <- phyloTree +
   # CFAR
   geom_fruit(
     data = sharkTraits,
@@ -376,7 +333,7 @@ phyloTreeFull <- phyloTreeOrder +
     mapping = aes(y = Genus_species, x = CFAR, fill = CFAR),
     orientation = "y",
     stat = "identity",
-    pwidth = 0.15,
+    pwidth = 0.3,
     offset = 0.01) +
   scale_fill_scico(palette = "cork") +
   new_scale_fill() +
@@ -388,7 +345,7 @@ phyloTreeFull <- phyloTreeOrder +
                   fill = log(MaximumBodySize)),
     orientation = "y",
     stat = "identity",
-    pwidth = 0.15,
+    pwidth = 0.3,
   ) +
   scale_fill_scico(palette = "bam") +
   new_scale_fill() +
@@ -400,7 +357,7 @@ phyloTreeFull <- phyloTreeOrder +
                   fill = ProportionalGillAverage),
     orientation = "y",
     stat = "identity",
-    pwidth = 0.1
+    pwidth = 0.3
   ) +
   scale_fill_scico(palette = "grayC") +
   new_scale_fill() +
@@ -411,9 +368,9 @@ phyloTreeFull <- phyloTreeOrder +
     mapping = aes(y = Genus_species, x = 0,
                   fill = WaterColumnPosition),
     stat = "identity",
-    width = 0.01,
+    width = 0.02,
     pwidth = 0.07,
-    offset = 0.1
+    offset = 0.075
   ) +
   scale_fill_manual(values = c("Pelagic" = "#82e1da",
                                "Benthic" = "#103f4d")) +
@@ -425,34 +382,75 @@ phyloTreeFull <- phyloTreeOrder +
     mapping = aes(y = Genus_species, x = 0,
                   fill = Tracked),
     stat = "identity",
-    width = 0.01,
+    width = 0.02,
     pwidth = 0.07,
-    offset = 0.15
+    offset = 0.271
   ) +
   scale_fill_manual(values = c("Yes" = "black",
                                "No" = "white")) +
+  new_scale_fill() +
   labs(fill = "") +
-  annotate("text", x = 0.54, y = 447, label = "Carcharhiniformes", size = 2.5) +
-  annotate("text", x = 0.51, y = 6, label = "Echinorhiniformes", size = 2.5) +
-  annotate("text", x = 0.76, y = 133, label = "Heterodontiformes", size = 2.5) +
-  annotate("text", x = 0.50, y = 2, label = "Hexanchiformes", size = 2.5) +
-  annotate("text", x = 0.78, y = 187, label = "Lamniformes", size = 2.5) +
-  annotate("text", x = 0.73, y = 175, label = "Orectolobiformes", size = 2.5) +
-  annotate("text", x = 0.51, y = 15, label = "Pristiophoriformes", size = 2.5) +
-  annotate("text", x = 0.83, y = 123, label = "Squaliformes", size = 2.5) +
   theme(legend.position = "none",
         margins = unit(c(1.1, 0.5, 0.1, 0),"cm"))
 
-phyloTreeFull
-
 # Add legends in custom position
-phyloTreeFinal <- ggdraw() +
+phyloTreeLegends <- ggdraw() +
   draw_plot(phyloTreeFull) +
-  draw_plot(tagLegend, x = 0.840, y = 0.175) +
-  draw_plot(posLegend, x = 0.775, y = 0.175) +
-  draw_plot(gillLegend, x = 0.688, y = -0.027) +
-  draw_plot(sizeLegend, x = 0.595, y = -0.027) +
-  draw_plot(CFARlegend, x = 0.505, y = -0.027)
+  draw_plot(tagLegend, x = 0.640, y = 0.175) +
+  draw_plot(posLegend, x = 0.572, y = 0.175) +
+  draw_plot(gillLegend, x = 0.480, y = -0.027) +
+  draw_plot(sizeLegend, x = 0.381, y = -0.027) +
+  draw_plot(CFARlegend, x = 0.285, y = -0.027)
+
+phyloTreeLegends
+```
+
+Add Order labels.
+
+```{r}
+phyloTreeLabel <- phyloTreeLegends + 
+  annotate("text", x = 0.85, y = 0.94, label = "Carcharhiniformes", 
+           size = 2.5, color = "#ba4848") +
+  annotate("text", x = 0.85, y = 0.4, label = "Lamniformes", 
+           size = 2.5, color = "#f7c435") +
+  annotate("text", x = 0.85, y = 0.35, label = "Orectolobiformes", 
+           size = 2.5, color = "#f0b6ad") +
+  annotate("text", x = 0.85, y = 0.28, label = "Heterodontiformes", 
+           size = 2.5, color = "#0b5227") +
+  annotate("text", x = 0.85, y = 0.2, label = "Squaliformes", 
+           size = 2.5, color = "#85a993") +
+  annotate("text", x = 0.85, y = 0.03, label = "Pristiophoriformes", 
+           size = 2.5, color = "#dc8864") +
+  annotate("text", x = 0.85, y = 0.02, label = "Echinorhiniformes", 
+           size = 2.5, color = "#818b2e") +
+  annotate("text", x = 0.85, y = 0.01, label = "Hexanchiformes", 
+           size = 2.5, color = "#c75a1b")
+
+phyloTreeLabel
+```
+
+Add silhouettes.
+
+```{r}
+# Get images from rphylopic
+carIMG <- get_phylopic(uuid = "07eeaf0e-0284-4c1d-8415-ddd65a736232")
+lamIMG <- get_phylopic(uuid = "a807f354-fd7c-4547-a7e8-573f7ca75e63")
+oreIMG <- get_phylopic(uuid = "9a1c5e03-89e1-433b-b702-c0b945fd51fa")
+hetIMG <- get_phylopic(uuid = "28a9e2ea-2221-4af7-97e4-61d130348ae5")
+squIMG <- get_phylopic(uuid = "c786f963-7e91-4ecc-8351-400a0ecfdfcc")
+
+# Add to tree
+phyloTreeFinal <- phyloTreeLabel +
+  add_phylopic(x = 0.85, y = 0.91, img = carIMG, height = 0.035,
+               fill = "#ba4848") +
+  add_phylopic(x = 0.85, y = 0.375, img = lamIMG, height = 0.035,
+               fill = "#f7c435") +
+  add_phylopic(x = 0.85, y = 0.335, img = oreIMG, height = 0.015,
+               fill = "#f0b6ad") +
+  add_phylopic(x = 0.85, y = 0.26, img = hetIMG, height = 0.025,
+               fill = "#0b5227") +
+  add_phylopic(x = 0.85, y = 0.18, img = squIMG, height = 0.021,
+               fill = "#85a993")
 
 phyloTreeFinal
 ```
@@ -474,5 +472,5 @@ Figure2 <- arrangeGrob(
 # Save final figure
 ggsave("Results/Figures/Fig2.tiff", Figure2, units = "px",
        device = "tiff", bg = "white",
-       width = 2000, height = 2350, dpi = 300)
+       width = 2000, height = 2450, dpi = 300)
 ```
