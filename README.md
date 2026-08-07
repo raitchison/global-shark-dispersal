@@ -1,8 +1,8 @@
-# From wings to tails: a general framework for estimating dispersal from morphology
+# From wings to tails: a general framework for inferring dispersal potential from morphology
 
 ## Overview
 
-Data and code for "From wings to tails: the aspect ratio of propulsive surfaces as a general proxy for vertebrate dispersal potential"
+Data and code for "From wings to tails: a general framework for inferring dispersal potential from morphology
 
 ## Contents and Structure
 
